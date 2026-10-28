@@ -176,7 +176,9 @@ export function whitenBorderArtifacts(img: ImageData, threshold = 38) {
   let tail = 0;
   const isArtifact = (p: number) => {
     const i = p * 4;
-    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
     return Math.max(r, g, b) < threshold && Math.max(r, g, b) - Math.min(r, g, b) < 24;
   };
   const add = (p: number) => {
