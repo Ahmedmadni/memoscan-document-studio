@@ -20,17 +20,17 @@ import { useI18n } from "@/lib/i18n";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MemoScan — ماسح ميمو | Private document scanner" },
+      { title: "Waraqah — ورقة | Scan and sign documents" },
       {
         name: "description",
         content:
           "Scan, straighten and enhance documents into multi-page PDFs — fully on your device.",
       },
-      { property: "og:title", content: "MemoScan — ماسح ميمو" },
+      { property: "og:title", content: "Waraqah — ورقة" },
       {
         property: "og:description",
         content:
-          "Private, offline-first document scanner with real perspective correction and PDF export.",
+          "Private document workspace for scanning pages and signing PDFs on-device.",
       },
     ],
   }),
