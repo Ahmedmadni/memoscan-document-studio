@@ -79,7 +79,9 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.624"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
