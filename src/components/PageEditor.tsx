@@ -21,6 +21,7 @@ const FILTERS: [FilterMode, TKey][] = [
   ["enhance", "fEnhance"],
   ["gray", "fGray"],
   ["bw", "fBw"],
+  ["clean", "fClean"],
 ];
 
 export function PageEditor({
