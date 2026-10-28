@@ -20,7 +20,7 @@ vi.mock("@/lib/imaging", async (importOriginal) => {
   return {
     ...actual,
     loadImageCanvas: async (blob: Blob) => {
-      const key = await blob.text();
+      const key = blob.type;
       return { width: 40, height: 60, toDataURL: () => URLS[key] };
     },
   };
@@ -31,7 +31,7 @@ function page(id: string): PageRecord {
     id,
     docId: "doc",
     original: new Blob([id]),
-    processed: new Blob([id]), // the mock maps this marker to its JPEG
+    processed: new Blob([id], { type: id }), // the mock maps this marker to its JPEG
     thumb: "",
     width: 40,
     height: 60,
