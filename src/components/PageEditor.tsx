@@ -7,6 +7,8 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import {
   detectDocument,
   FULL_CORNERS,
+  isConvexQuad,
+  quadArea,
   loadImageCanvas,
   processPage,
   scaleCanvas,
@@ -108,6 +110,7 @@ export function PageEditor({
     const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     const c = s.corners.map((p) => ({ ...p })) as Corners;
     c[i] = { x, y };
+    if (!isConvexQuad(c) || quadArea(c) < 0.08) return;
     update({ corners: c }, "corner" + i);
   }
   function nudge(i: number, e: React.KeyboardEvent) {
@@ -121,6 +124,7 @@ export function PageEditor({
       x: Math.min(1, Math.max(0, c[i].x + d[0] * 0.005)),
       y: Math.min(1, Math.max(0, c[i].y + d[1] * 0.005)),
     };
+    if (!isConvexQuad(c) || quadArea(c) < 0.08) return;
     update({ corners: c }, "corner" + i);
   }
 
