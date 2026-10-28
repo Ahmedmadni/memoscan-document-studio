@@ -64,6 +64,15 @@ export function removeId(ids: string[], id: string): string[] {
   return ids.filter((x) => x !== id);
 }
 
+/** Move the id at `from` to position `to` (drag-and-drop reorder). Out-of-range or no-op moves return the same array. */
+export function reorderPages(ids: string[], from: number, to: number): string[] {
+  if (from < 0 || from >= ids.length || to < 0 || to >= ids.length || from === to) return ids;
+  const n = [...ids];
+  const [moved] = n.splice(from, 1);
+  n.splice(to, 0, moved!);
+  return n;
+}
+
 /** Re-insert an id at its original position, clamped to the current list length. */
 export function reinsertAt(ids: string[], index: number, id: string): string[] {
   const n = ids.filter((x) => x !== id);

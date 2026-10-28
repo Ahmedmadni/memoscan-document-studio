@@ -1,3 +1,19 @@
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -5,6 +21,7 @@ import {
   ChevronUp,
   Copy,
   Download,
+  GripVertical,
   Loader2,
   Pencil,
   RefreshCw,
@@ -17,20 +34,12 @@ import { AppHeader } from "@/components/AppHeader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
-import {
-  deletePage,
-  getDoc,
-  getPages,
-  putDoc,
-  putPage,
-  uid,
-  type DocRecord,
-  type PageRecord,
-} from "@/lib/db";
-import { addFilesToDoc, insertAfter, movePage, reinsertAt, removeId } from "@/lib/docOps";
+import { getDoc, getPages, putDoc, putPage, uid, type DocRecord, type PageRecord } from "@/lib/db";
+import { addFilesToDoc, insertAfter, movePage, reorderPages } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
+import { PendingDeletes } from "@/lib/pendingDeletes";
 import {
   canShareFile,
   downloadBlob,
@@ -69,8 +78,15 @@ function DocPage() {
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
-  // pageId -> original index, for soft deletes awaiting undo or finalization.
-  const pendingDeletes = useRef(new Map<string, number>());
+  // Soft deletes awaiting undo or finalization; finalized on unmount.
+  const pendingDeletes = useRef<PendingDeletes | null>(null);
+  pendingDeletes.current ??= new PendingDeletes(6000);
+  useEffect(() => () => pendingDeletes.current?.dispose(), []);
+  // A small movement threshold keeps taps (open editor) from starting a drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const load = useCallback(async () => {
     try {
@@ -125,6 +141,39 @@ function DocPage() {
 
   const ids = doc.pageIds;
   const move = (i: number, d: number) => void run("", () => saveOrder(movePage(ids, i, d)));
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    const next = reorderPages(ids, from, to);
+    if (next !== ids) void run("", () => saveOrder(next));
+  };
+  const softDeletePage = (p: PageRecord, index: number) => {
+    const manager = pendingDeletes.current!;
+    void run("", async () => {
+      const next = manager.softDelete(ids, p.id);
+      if (next === ids) return;
+      await saveOrder(next);
+      const finalize = () => void manager.finalize(p.id);
+      toast(t("pageDeleted"), {
+        duration: 6000,
+        action: {
+          label: t("undo"),
+          onClick: () => {
+            void run("", async () => {
+              const fresh = await getDoc(doc.id);
+              if (!fresh) return;
+              const restored = manager.undo(fresh.pageIds, p.id);
+              if (restored) await saveOrder(restored, fresh);
+            });
+          },
+        },
+        onAutoClose: finalize,
+        onDismiss: finalize,
+      });
+    });
+  };
 
   return (
     <div className="min-h-screen">
@@ -174,98 +223,37 @@ function DocPage() {
             {t("noPages")}
           </p>
         ) : (
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {pages.map((p, i) => (
-              <li key={p.id} className="overflow-hidden rounded-xl border bg-card shadow-paper">
-                <button
-                  className="relative block aspect-[3/4] w-full bg-muted"
-                  onClick={() => setEditing(p)}
-                  aria-label={`${t("edit")} ${i + 1}`}
-                >
-                  <img src={p.thumb} alt="" className="size-full object-contain" />
-                  <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
-                    {i + 1}
-                  </span>
-                </button>
-                <p
-                  className={`px-2 pt-1 text-[11px] ${p.autoDetected ? "text-success" : "text-warning"}`}
-                >
-                  {p.autoDetected ? t("autoBadge") : t("manualBadge")}
-                </p>
-                <div className="flex flex-wrap justify-center p-1">
-                  <IconBtn label={t("edit")} onClick={() => setEditing(p)}>
-                    <Pencil />
-                  </IconBtn>
-                  <IconBtn label={t("moveEarlier")} disabled={i === 0} onClick={() => move(i, -1)}>
-                    <ChevronUp />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("moveLater")}
-                    disabled={i === pages.length - 1}
-                    onClick={() => move(i, 1)}
-                  >
-                    <ChevronDown />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("duplicate")}
-                    onClick={() =>
-                      run("", async () => {
-                        const copy = { ...p, id: uid(), createdAt: Date.now() };
-                        await putPage(copy);
-                        await saveOrder(insertAfter(ids, i, copy.id));
-                      })
-                    }
-                  >
-                    <Copy />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("replace")}
-                    onClick={() => {
-                      replaceTarget.current = p.id;
-                      replaceInput.current?.click();
-                    }}
-                  >
-                    <RefreshCw />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("delete")}
-                    onClick={() => {
-                      // Soft delete: the page leaves the order now; its record is erased only
-                      // when the toast ends without an undo. Pending deletes are tracked by id
-                      // so undo re-inserts at the original index in the *current* order and
-                      // each toast finalizes at most once.
-                      const index = i;
-                      void run("", async () => {
-                        pendingDeletes.current.set(p.id, index);
-                        await saveOrder(removeId(ids, p.id));
-                        const finalize = () => {
-                          if (pendingDeletes.current.delete(p.id)) void deletePage(p.id);
-                        };
-                        toast(t("pageDeleted"), {
-                          duration: 6000,
-                          action: {
-                            label: t("undo"),
-                            onClick: () => {
-                              if (!pendingDeletes.current.delete(p.id)) return;
-                              void run("", async () => {
-                                const fresh = await getDoc(doc.id);
-                                if (fresh)
-                                  await saveOrder(reinsertAt(fresh.pageIds, index, p.id), fresh);
-                              });
-                            },
-                          },
-                          onAutoClose: finalize,
-                          onDismiss: finalize,
-                        });
-                      });
-                    }}
-                  >
-                    <Trash2 className="text-destructive" />
-                  </IconBtn>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={ids} strategy={rectSortingStrategy}>
+                <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {pages.map((p, i) => (
+                    <SortablePageCard
+                      key={p.id}
+                      page={p}
+                      index={i}
+                      total={pages.length}
+                      onEdit={() => setEditing(p)}
+                      onMove={(d) => move(i, d)}
+                      onDuplicate={() =>
+                        run("", async () => {
+                          const copy = { ...p, id: uid(), createdAt: Date.now() };
+                          await putPage(copy);
+                          await saveOrder(insertAfter(ids, i, copy.id));
+                        })
+                      }
+                      onReplace={() => {
+                        replaceTarget.current = p.id;
+                        replaceInput.current?.click();
+                      }}
+                      onDelete={() => softDeletePage(p, i)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          </>
         )}
         <input
           ref={replaceInput}
@@ -369,6 +357,85 @@ function DocPage() {
         />
       )}
     </div>
+  );
+}
+
+function SortablePageCard({
+  page: p,
+  index: i,
+  total,
+  onEdit,
+  onMove,
+  onDuplicate,
+  onReplace,
+  onDelete,
+}: {
+  page: PageRecord;
+  index: number;
+  total: number;
+  onEdit: () => void;
+  onMove: (delta: number) => void;
+  onDuplicate: () => void;
+  onReplace: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useI18n();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: p.id,
+  });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`overflow-hidden rounded-xl border bg-card shadow-paper ${
+        isDragging ? "z-10 opacity-60 ring-2 ring-primary" : ""
+      }`}
+    >
+      <div className="relative">
+        <button
+          className="relative block aspect-[3/4] w-full bg-muted"
+          onClick={onEdit}
+          aria-label={`${t("edit")} ${i + 1}`}
+        >
+          <img src={p.thumb} alt="" className="size-full object-contain" />
+          <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
+            {i + 1}
+          </span>
+        </button>
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label={`${t("dragToReorder")} ${i + 1}`}
+          title={t("dragToReorder")}
+          className="absolute end-1 top-1 grid size-8 cursor-grab touch-none place-items-center rounded-md bg-stage/80 text-stage-foreground active:cursor-grabbing"
+        >
+          <GripVertical className="size-4" />
+        </button>
+      </div>
+      <p className={`px-2 pt-1 text-[11px] ${p.autoDetected ? "text-success" : "text-warning"}`}>
+        {p.autoDetected ? t("autoBadge") : t("manualBadge")}
+      </p>
+      <div className="flex flex-wrap justify-center p-1">
+        <IconBtn label={t("edit")} onClick={onEdit}>
+          <Pencil />
+        </IconBtn>
+        <IconBtn label={t("moveEarlier")} disabled={i === 0} onClick={() => onMove(-1)}>
+          <ChevronUp />
+        </IconBtn>
+        <IconBtn label={t("moveLater")} disabled={i === total - 1} onClick={() => onMove(1)}>
+          <ChevronDown />
+        </IconBtn>
+        <IconBtn label={t("duplicate")} onClick={onDuplicate}>
+          <Copy />
+        </IconBtn>
+        <IconBtn label={t("replace")} onClick={onReplace}>
+          <RefreshCw />
+        </IconBtn>
+        <IconBtn label={t("delete")} onClick={onDelete}>
+          <Trash2 className="text-destructive" />
+        </IconBtn>
+      </div>
+    </li>
   );
 }
 
