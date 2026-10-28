@@ -177,7 +177,7 @@ function SignPage() {
             <h2 className="mb-2 font-semibold">{ar ? "2. مصدر التوقيع" : "2. Signature source"}</h2>
             <div className="flex flex-wrap gap-2">
               <Button variant={signatureMode === "draw" ? "default" : "outline"} onClick={() => setSignatureMode("draw")}><FileSignature className="me-2 size-4" />{ar ? "ارسم توقيعًا" : "Draw signature"}</Button>
-              <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => void chooseSignature(e.target.files?.[0])} />
+              <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => void chooseSignature(e.target.files?.[0])} />
               <Button variant="outline" onClick={() => imageInputRef.current?.click()}><ImagePlus className="me-2 size-4" />{ar ? "استيراد من الصور" : "Import from photos"}</Button>
             </div>
           </div>
