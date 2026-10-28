@@ -12,7 +12,8 @@ The workflows share one document library, common file import/export, local-first
 
 - Home screen presents two clear primary actions: **Scan document** and **Sign a PDF**.
 - A unified **My documents** library shows scanned projects and imported PDF files with type labels, last-updated time, page count where available, rename, duplicate/export and delete actions.
-- A document opened from the scanner can move directly to signing without downloading/re-importing.
+- Scanning and signing are independent workflows. Scanned documents stay in the shared library and are never automatically sent to signing.
+- Offer an explicit **Sign this PDF** action only when the user chooses it for a scanned/exported document; the user may also sign a separately imported PDF without scanning anything.
 - A document opened from Sign PDF can be signed and exported as a new file; preserve the original by default.
 - Arabic-first RTL and English LTR layouts; support narrow Android screens, keyboard navigation, accessible labels and visible progress/error states.
 - Keep the existing package ID com.ahmedelmadni.memoscan so the rebrand does not break install identity.
@@ -22,7 +23,8 @@ The workflows share one document library, common file import/export, local-first
 - Import a PDF using the system file picker or choose a PDF exported from Waraqah.
 - Preview PDF pages and navigate between pages.
 - Create a visual signature by drawing with touch/stylus/mouse on a high-resolution canvas; also offer typed-name signature as an optional convenience, clearly distinguished from hand-drawn signing.
-- Preview, clear and recreate signatures; retain reusable signatures only after explicit opt-in.
+- Import an existing signature image from the device photo gallery/image picker (PNG with transparency preferred; JPEG supported). Preview and crop/trim transparent margins where feasible, preserve aspect ratio, and let the user confirm before placing it.
+- Preview, clear and recreate signatures; import a signature image from the photo library; retain reusable signatures only after explicit opt-in. Provide a clear way to remove a saved signature.
 - Place, move, resize and remove signature overlays on a selected page; support undo before export.
 - Export a new PDF with the signature embedded at the intended page coordinates, preserving page dimensions and orientation. Keep the source PDF unchanged.
 - Confirm export, provide a filename, and use the same download/share flow as scan exports.
@@ -44,7 +46,7 @@ The workflows share one document library, common file import/export, local-first
 
 - The MVP embeds a **visual signature image** into a PDF. It is not a certificate-backed cryptographic digital signature, does not independently verify signer identity, and must not be marketed as providing those guarantees.
 - Explain this distinction in the UI/help/privacy copy. A future advanced phase may explore certificate-based PDF signatures, identity verification, audit trails and timestamping after legal and security review.
-- Ask before storing reusable signatures; allow deleting them. Avoid analytics or logging containing document names, file contents or signature pixels.
+- Ask before storing reusable signatures; allow deleting them. An image selected from the photo library is used only after explicit user selection and confirmation; do not scan the photo library in the background. Avoid analytics or logging containing document names, file contents or signature pixels.
 - Warn that a signature placed on a document may have legal consequences and encourage review before final export.
 
 ## Delivery phases and acceptance criteria
@@ -58,12 +60,12 @@ The workflows share one document library, common file import/export, local-first
 - Update branding and metadata across home/document/privacy pages.
 - Add Scan / Sign entry points without removing current scanner capabilities.
 - Establish shared document types and safe local storage migration.
-- Acceptance: existing scanner documents remain accessible; both entry points work in Arabic and English; no duplicate libraries.
+- Acceptance: existing scanner documents remain accessible; scan and sign can be started independently; scanned documents are not automatically routed to signing; both entry points work in Arabic and English; no duplicate libraries.
 
 ### Phase 2 — Signature capture and placement
 - Implement draw/clear/recreate signature canvas with touch, stylus and mouse support.
 - Add PDF import, viewer/page navigation, placement overlay, drag/resize, undo and page-boundary constraints.
-- Acceptance: placement stays aligned after zoom/rotation and on small/large screens; blank signatures cannot be exported.
+- Acceptance: placement stays aligned after zoom/rotation and on small/large screens; blank signatures cannot be exported; an image chosen from the gallery can be previewed, rejected, or placed without forcing a scan workflow.
 
 ### Phase 3 — PDF export and shared handoff
 - Embed the visual signature into a copy of the original PDF, preserving all pages, page sizes and orientation.
