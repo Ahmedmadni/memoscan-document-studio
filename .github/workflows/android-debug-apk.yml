@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Format signing workspace
+        run: bunx prettier --write src/routes/sign.tsx
+
       - name: Run tests and lint
         run: |
           bun run test
