@@ -11,7 +11,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "bun run build && bunx cap sync android",
+    "cap:open:android": "bunx cap open android",
+    "cap:add:android": "bunx cap add android"
   },
   "overrides": {
     "rolldown": "1.2.1"
