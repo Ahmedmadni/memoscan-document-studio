@@ -1,6 +1,6 @@
 # Waraqah — ورقة
 
-Waraqah is a professional document-scanning app designed for Arabic-first mobile use, with an English interface option and Android packaging through Capacitor.
+Waraqah is a privacy-first document workspace for scanning paper documents and signing PDF files, designed for Arabic-first mobile use with an English interface and Android packaging through Capacitor.
 
 **Tagline:** From paper to a polished file — in seconds.  
 **الشعار:** من الورق إلى ملف جاهز — في ثوانٍ.
@@ -13,6 +13,11 @@ Waraqah is a professional document-scanning app designed for Arabic-first mobile
 4. A multi-page document workspace with local persistence (IndexedDB), thumbnails, rename, create/open/delete documents, and graceful empty/loading/error states.
 5. Multi-page PDF export with quality options, download/share support and fallbacks. User documents must not be uploaded to a server.
 6. A clear in-app privacy note explaining local processing and storage. Do not seed fake documents or fabricate results.
+7. A unified Scan + Sign experience: scan images into PDFs, import existing PDFs, place a visual signature, and export a signed copy while preserving the original.
+
+## Scan + Sign roadmap
+
+See [ROADMAP-SCAN-AND-SIGN.md](./ROADMAP-SCAN-AND-SIGN.md) for the product architecture, phased implementation plan, acceptance criteria, privacy requirements, and release checklist. The planned signing MVP embeds a visual signature; it is not a certificate-backed cryptographic digital signature.
 
 ## Engineering
 
