@@ -29,10 +29,22 @@ export function ImagePickers({
       <Button size={size} disabled={disabled} onClick={() => cam.current?.click()}>
         <Camera /> {t("scanCamera")}
       </Button>
-      <Button size={size} variant="outline" disabled={disabled} onClick={() => lib.current?.click()}>
+      <Button
+        size={size}
+        variant="outline"
+        disabled={disabled}
+        onClick={() => lib.current?.click()}
+      >
         <ImagePlus /> {t("importImages")}
       </Button>
-      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={handle} />
+      <input
+        ref={cam}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={handle}
+      />
       <input ref={lib} type="file" accept="image/*" multiple hidden onChange={handle} />
     </div>
   );

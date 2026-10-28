@@ -63,3 +63,10 @@ export function insertAfter(ids: string[], index: number, id: string): string[] 
 export function removeId(ids: string[], id: string): string[] {
   return ids.filter((x) => x !== id);
 }
+
+/** Re-insert an id at its original position, clamped to the current list length. */
+export function reinsertAt(ids: string[], index: number, id: string): string[] {
+  const n = ids.filter((x) => x !== id);
+  n.splice(Math.max(0, Math.min(index, n.length)), 0, id);
+  return n;
+}

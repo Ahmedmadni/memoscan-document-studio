@@ -231,7 +231,11 @@ function sharpen(img: ImageData, amount: number) {
       const i = (y * w + x) * 4;
       for (let c = 0; c < 3; c++) {
         const lap =
-          4 * src[i + c] - src[i - 4 + c] - src[i + 4 + c] - src[i - w * 4 + c] - src[i + w * 4 + c];
+          4 * src[i + c] -
+          src[i - 4 + c] -
+          src[i + 4 + c] -
+          src[i - w * 4 + c] -
+          src[i + w * 4 + c];
         d[i + c] = src[i + c] + lap * a;
       }
     }
@@ -355,7 +359,8 @@ export function detectDocument(src: HTMLCanvasElement): DetectResult {
   const h = small.height;
   const d = ctx2d(small).getImageData(0, 0, w, h).data;
   const g = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  for (let i = 0; i < w * h; i++)
+    g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
   return detectFromGray(g, w, h);
 }
 
@@ -401,8 +406,10 @@ export function detectFromGray(g: Uint8Array, w: number, h: number): DetectResul
   for (let y = 1; y < h - 1; y++)
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      const gx = b[i - w + 1] + 2 * b[i + 1] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - 1] - b[i + w - 1];
-      const gy = b[i + w - 1] + 2 * b[i + w] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - w] - b[i - w + 1];
+      const gx =
+        b[i - w + 1] + 2 * b[i + 1] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - 1] - b[i + w - 1];
+      const gy =
+        b[i + w - 1] + 2 * b[i + w] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - w] - b[i - w + 1];
       mag[i] = Math.hypot(gx, gy);
     }
   const sorted = Float32Array.from(mag).sort();
@@ -411,7 +418,8 @@ export function detectFromGray(g: Uint8Array, w: number, h: number): DetectResul
   for (let y = 1; y < h - 1; y++)
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      if (mag[i] >= thr) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) edge[i + dy * w + dx] = 1;
+      if (mag[i] >= thr)
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) edge[i + dy * w + dx] = 1;
     }
   const bg = new Uint8Array(w * h);
   const stack: number[] = [];
@@ -453,7 +461,12 @@ export function cornersFromMask(mask: Uint8Array, w: number, h: number): Corners
       size++;
       const x = p % w;
       const y = (p / w) | 0;
-      const nb = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
+      const nb = [
+        x > 0 ? p - 1 : -1,
+        x < w - 1 ? p + 1 : -1,
+        y > 0 ? p - w : -1,
+        y < h - 1 ? p + w : -1,
+      ];
       for (const q of nb)
         if (q >= 0 && mask[q] && !label[q]) {
           label[q] = cur;

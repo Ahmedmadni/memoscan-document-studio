@@ -1,7 +1,16 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
-import { createDoc, deleteDoc, getDoc, getPages, listDocs, putDoc, putPage, type PageRecord } from "@/lib/db";
-import { insertAfter, movePage, removeId } from "@/lib/docOps";
+import {
+  createDoc,
+  deleteDoc,
+  getDoc,
+  getPages,
+  listDocs,
+  putDoc,
+  putPage,
+  type PageRecord,
+} from "@/lib/db";
+import { insertAfter, movePage, reinsertAt, removeId } from "@/lib/docOps";
 import {
   applyAdjustments,
   buildLut,
@@ -15,7 +24,18 @@ import {
 
 const blob = () => new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" });
 function page(id: string, docId: string): PageRecord {
-  return { id, docId, original: blob(), processed: blob(), thumb: "", width: 1, height: 1, settings: defaultSettings(), autoDetected: false, createdAt: 0 };
+  return {
+    id,
+    docId,
+    original: blob(),
+    processed: blob(),
+    thumb: "",
+    width: 1,
+    height: 1,
+    settings: defaultSettings(),
+    autoDetected: false,
+    createdAt: 0,
+  };
 }
 
 describe("page order helpers", () => {
@@ -30,6 +50,15 @@ describe("page order helpers", () => {
   it("duplicates right after the source and removes by id", () => {
     expect(insertAfter(["a", "b"], 0, "a2")).toEqual(["a", "a2", "b"]);
     expect(removeId(["a", "b", "c"], "b")).toEqual(["a", "c"]);
+  });
+  it("undo re-inserts at the original index in the current order", () => {
+    // Delete "b" at index 1, then delete "c"; undoing "b" must not resurrect "c".
+    const afterTwoDeletes = removeId(removeId(["a", "b", "c"], "b"), "c");
+    expect(reinsertAt(afterTwoDeletes, 1, "b")).toEqual(["a", "b"]);
+  });
+  it("undo clamps the index when the list shrank and never duplicates the id", () => {
+    expect(reinsertAt(["a"], 5, "b")).toEqual(["a", "b"]);
+    expect(reinsertAt(["a", "b"], 0, "b")).toEqual(["b", "a"]);
   });
 });
 
@@ -57,7 +86,8 @@ function synth(w: number, h: number, bg: number, fg: number, quad: [number, numb
   const inside = (x: number, y: number) => {
     let c = false;
     for (let i = 0, j = 3; i < 4; j = i++) {
-      const [xi, yi] = quad[i]!; const [xj, yj] = quad[j]!;
+      const [xi, yi] = quad[i]!;
+      const [xj, yj] = quad[j]!;
       if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
     }
     return c;
@@ -67,7 +97,12 @@ function synth(w: number, h: number, bg: number, fg: number, quad: [number, numb
 }
 
 describe("edge detection", () => {
-  const quad: [number, number][] = [[60, 30], [250, 50], [235, 210], [45, 195]];
+  const quad: [number, number][] = [
+    [60, 30],
+    [250, 50],
+    [235, 210],
+    [45, 195],
+  ];
   it("finds a tilted light page on a dark background", () => {
     const r = detectFromGray(synth(300, 240, 50, 230, quad), 300, 240);
     expect(r.detected).toBe(true);
@@ -88,12 +123,27 @@ describe("edge detection", () => {
 
 describe("geometry edge cases", () => {
   it("throws on degenerate (collinear) corners", () => {
-    const rect = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
-    const line = [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }];
+    const rect = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const line = [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 3 },
+    ];
     expect(() => solveHomography(rect, line)).toThrow();
   });
   it("rejects a near-degenerate quad", () => {
-    const c: Corners = [{ x: 0, y: 0 }, { x: 0.5, y: 0.5 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+    const c: Corners = [
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0.5 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
     expect(isConvexQuad(c)).toBe(false);
   });
 });

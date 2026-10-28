@@ -36,7 +36,11 @@ export function PageEditor({
   const [src, setSrc] = useState<HTMLCanvasElement | null>(null);
   const [srcUrl, setSrcUrl] = useState("");
   const [tab, setTab] = useState<"corners" | "adjust">("corners");
-  const [hist, setHist] = useState({ past: [] as EditSettings[], present: page.settings, future: [] as EditSettings[] });
+  const [hist, setHist] = useState({
+    past: [] as EditSettings[],
+    present: page.settings,
+    future: [] as EditSettings[],
+  });
   const last = useRef({ key: "", time: 0 });
   const [after, setAfter] = useState("");
   const [before, setBefore] = useState("");
@@ -62,7 +66,9 @@ export function PageEditor({
     const id = setTimeout(() => {
       try {
         setAfter(processPage(preview, s, 1000).toDataURL("image/jpeg", 0.85));
-        setBefore(processPage(preview, s, 1000, { skipAdjust: true }).toDataURL("image/jpeg", 0.85));
+        setBefore(
+          processPage(preview, s, 1000, { skipAdjust: true }).toDataURL("image/jpeg", 0.85),
+        );
       } catch {
         toast.error(t("errGeneric"));
       }
@@ -82,9 +88,17 @@ export function PageEditor({
     }));
   }
   const undo = () =>
-    setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past.at(-1)!, future: [h.present, ...h.future] } : h));
+    setHist((h) =>
+      h.past.length
+        ? { past: h.past.slice(0, -1), present: h.past.at(-1)!, future: [h.present, ...h.future] }
+        : h,
+    );
   const redo = () =>
-    setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
+    setHist((h) =>
+      h.future.length
+        ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) }
+        : h,
+    );
 
   const box = useRef<HTMLDivElement>(null);
   function drag(i: number, e: React.PointerEvent) {
@@ -96,11 +110,16 @@ export function PageEditor({
     update({ corners: c }, "corner" + i);
   }
   function nudge(i: number, e: React.KeyboardEvent) {
-    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[
+      e.key
+    ];
     if (!d) return;
     e.preventDefault();
     const c = s.corners.map((p) => ({ ...p })) as Corners;
-    c[i] = { x: Math.min(1, Math.max(0, c[i].x + d[0] * 0.005)), y: Math.min(1, Math.max(0, c[i].y + d[1] * 0.005)) };
+    c[i] = {
+      x: Math.min(1, Math.max(0, c[i].x + d[0] * 0.005)),
+      y: Math.min(1, Math.max(0, c[i].y + d[1] * 0.005)),
+    };
     update({ corners: c }, "corner" + i);
   }
 
@@ -117,8 +136,15 @@ export function PageEditor({
     }
   }
 
-  const rot = (d: number) => update({ rotation: ((((s.rotation + d) % 360) + 360) % 360) as Rotation }, "rot" + Date.now());
-  const slider = (k: "brightness" | "contrast" | "sharpen" | "threshold" | "angle", label: TKey, min: number, max: number, step = 1) => (
+  const rot = (d: number) =>
+    update({ rotation: ((((s.rotation + d) % 360) + 360) % 360) as Rotation }, "rot" + Date.now());
+  const slider = (
+    k: "brightness" | "contrast" | "sharpen" | "threshold" | "angle",
+    label: TKey,
+    min: number,
+    max: number,
+    step = 1,
+  ) => (
     <label className="block text-sm">
       <span className="flex justify-between">
         {t(label)} <span className="text-muted-foreground tabular-nums">{s[k]}</span>
@@ -143,16 +169,33 @@ export function PageEditor({
         </Button>
         <div className="flex rounded-lg bg-muted p-1">
           {(["corners", "adjust"] as const).map((k) => (
-            <button key={k} className="chip border-0" aria-pressed={tab === k} onClick={() => setTab(k)}>
+            <button
+              key={k}
+              className="chip border-0"
+              aria-pressed={tab === k}
+              onClick={() => setTab(k)}
+            >
               {t(k)}
             </button>
           ))}
         </div>
         <div className="ms-auto flex gap-1">
-          <Button variant="ghost" size="icon" aria-label={t("undo")} disabled={!hist.past.length} onClick={undo}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("undo")}
+            disabled={!hist.past.length}
+            onClick={undo}
+          >
             <Undo2 />
           </Button>
-          <Button variant="ghost" size="icon" aria-label={t("redo")} disabled={!hist.future.length} onClick={redo}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("redo")}
+            disabled={!hist.future.length}
+            onClick={redo}
+          >
             <Redo2 />
           </Button>
           <Button onClick={save} disabled={saving || !src}>
@@ -166,7 +209,11 @@ export function PageEditor({
         {src && tab === "corners" && (
           <div ref={box} className="relative touch-none select-none">
             <img src={srcUrl} alt="" className="block max-h-[55vh] max-w-full" draggable={false} />
-            <svg className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 1 1" preserveAspectRatio="none">
+            <svg
+              className="pointer-events-none absolute inset-0 size-full"
+              viewBox="0 0 1 1"
+              preserveAspectRatio="none"
+            >
               <polygon
                 points={s.corners.map((p) => `${p.x},${p.y}`).join(" ")}
                 className="fill-handle/20 stroke-handle"
@@ -199,7 +246,10 @@ export function PageEditor({
               className="absolute inset-0 h-full w-full object-contain"
               style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}
             />
-            <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-handle" style={{ left: `${split}%` }} />
+            <div
+              className="pointer-events-none absolute inset-y-0 w-0.5 bg-handle"
+              style={{ left: `${split}%` }}
+            />
           </div>
         )}
       </div>
@@ -220,7 +270,10 @@ export function PageEditor({
               >
                 <Wand2 /> {t("autoDetect")}
               </Button>
-              <Button variant="outline" onClick={() => update({ corners: FULL_CORNERS }, "full" + Date.now())}>
+              <Button
+                variant="outline"
+                onClick={() => update({ corners: FULL_CORNERS }, "full" + Date.now())}
+              >
                 {t("fullImage")}
               </Button>
             </div>
@@ -230,24 +283,48 @@ export function PageEditor({
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               {FILTERS.map(([f, k]) => (
-                <button key={f} className="chip" aria-pressed={s.filter === f} onClick={() => update({ filter: f }, "f" + Date.now())}>
+                <button
+                  key={f}
+                  className="chip"
+                  aria-pressed={s.filter === f}
+                  onClick={() => update({ filter: f }, "f" + Date.now())}
+                >
                   {t(k)}
                 </button>
               ))}
-              <Button variant="outline" size="icon" aria-label={t("rotateL")} onClick={() => rot(-90)}>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={t("rotateL")}
+                onClick={() => rot(-90)}
+              >
                 <RotateCcw />
               </Button>
-              <Button variant="outline" size="icon" aria-label={t("rotateR")} onClick={() => rot(90)}>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={t("rotateR")}
+                onClick={() => rot(90)}
+              >
                 <RotateCw />
               </Button>
             </div>
             {slider("angle", "deskew", -15, 15, 0.5)}
             {slider("brightness", "brightness", -100, 100)}
             {slider("contrast", "contrast", -100, 100)}
-            {s.filter === "bw" ? slider("threshold", "threshold", 0, 30) : slider("sharpen", "sharpen", 0, 100)}
+            {s.filter === "bw"
+              ? slider("threshold", "threshold", 0, 30)
+              : slider("sharpen", "sharpen", 0, 100)}
             <label className="block text-sm sm:col-span-2">
               {t("compare")}
-              <input type="range" min={0} max={100} value={split} onChange={(e) => setSplit(+e.target.value)} className="mt-1 w-full accent-accent" />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={split}
+                onChange={(e) => setSplit(+e.target.value)}
+                className="mt-1 w-full accent-accent"
+              />
             </label>
           </div>
         )}

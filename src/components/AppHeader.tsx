@@ -9,7 +9,10 @@ export function AppHeader({ start }: { start?: ReactNode }) {
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
         {start ?? (
-          <Link to="/" className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
+          <Link
+            to="/"
+            className="flex items-center gap-2 font-display text-lg font-semibold text-foreground"
+          >
             <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
               <ScanLine className="size-4" />
             </span>

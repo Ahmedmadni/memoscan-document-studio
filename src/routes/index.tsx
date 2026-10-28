@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { Button } from "@/components/ui/button";
-import { createDoc, deleteDoc, getPage, listDocs, requestPersistence, type DocRecord } from "@/lib/db";
+import {
+  createDoc,
+  deleteDoc,
+  getPage,
+  listDocs,
+  requestPersistence,
+  type DocRecord,
+} from "@/lib/db";
 import { addFilesToDoc, defaultDocName } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
@@ -14,9 +21,17 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "MemoScan — ماسح ميمو | Private document scanner" },
-      { name: "description", content: "Scan, straighten and enhance documents into multi-page PDFs — fully on your device." },
+      {
+        name: "description",
+        content:
+          "Scan, straighten and enhance documents into multi-page PDFs — fully on your device.",
+      },
       { property: "og:title", content: "MemoScan — ماسح ميمو" },
-      { property: "og:description", content: "Private, offline-first document scanner with real perspective correction and PDF export." },
+      {
+        property: "og:description",
+        content:
+          "Private, offline-first document scanner with real perspective correction and PDF export.",
+      },
     ],
   }),
   component: Home,
@@ -35,7 +50,10 @@ function Home() {
     try {
       const list = await listDocs();
       const withThumbs = await Promise.all(
-        list.map(async (d) => ({ ...d, thumb: d.pageIds[0] ? (await getPage(d.pageIds[0]))?.thumb : undefined })),
+        list.map(async (d) => ({
+          ...d,
+          thumb: d.pageIds[0] ? (await getPage(d.pageIds[0]))?.thumb : undefined,
+        })),
       );
       setDocs(withThumbs);
     } catch (e) {
@@ -108,7 +126,11 @@ function Home() {
           </Button>
         </div>
 
-        {error && <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-destructive">{error}</p>}
+        {error && (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-destructive">
+            {error}
+          </p>
+        )}
         {!error && docs === null && (
           <p className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> {t("loading")}
@@ -134,7 +156,10 @@ function Home() {
         {!!docs?.length && (
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {docs.map((d) => (
-              <li key={d.id} className="group overflow-hidden rounded-xl border bg-card shadow-paper">
+              <li
+                key={d.id}
+                className="group overflow-hidden rounded-xl border bg-card shadow-paper"
+              >
                 <Link to="/doc/$id" params={{ id: d.id }} className="block">
                   <div className="aspect-[3/4] bg-muted">
                     {d.thumb ? (
@@ -150,10 +175,16 @@ function Home() {
                   <Link to="/doc/$id" params={{ id: d.id }} className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{d.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {d.pageIds.length} {t("pages")} · {new Date(d.updatedAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")}
+                      {d.pageIds.length} {t("pages")} ·{" "}
+                      {new Date(d.updatedAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")}
                     </p>
                   </Link>
-                  <Button variant="ghost" size="icon" aria-label={t("delete")} onClick={() => remove(d.id)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("delete")}
+                    onClick={() => remove(d.id)}
+                  >
                     <Trash2 className="text-destructive" />
                   </Button>
                 </div>
