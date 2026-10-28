@@ -1,11 +1,10 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-// The web build (vite build) emits the prerendered static app into dist/client;
-// `bun run cap:sync` rebuilds it and copies it into the Android project.
+// TanStack Start's Nitro build writes the SPA shell and public assets to .output/public.
 const config: CapacitorConfig = {
   appId: "com.ahmedelmadni.memoscan",
   appName: "MemoScan",
-  webDir: "dist/client",
+  webDir: ".output/public",
   android: {
     // Documents stay on-device (IndexedDB); no cleartext traffic needed.
     allowMixedContent: false,
