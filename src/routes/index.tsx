@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type DocWithThumb = DocRecord & { thumb?: string };
+type DocWithThumb = DocRecord & { thumb?: string | undefined };
 
 function Home() {
   const { t, lang } = useI18n();

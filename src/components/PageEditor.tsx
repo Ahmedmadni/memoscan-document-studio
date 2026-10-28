@@ -164,8 +164,8 @@ export function PageEditor({
       <div className="flex min-h-0 flex-1 items-center justify-center bg-stage p-4" dir="ltr">
         {!src && <Loader2 className="size-8 animate-spin text-stage-foreground" />}
         {src && tab === "corners" && (
-          <div ref={box} className="relative max-h-full touch-none select-none" style={{ aspectRatio: `${src.width}/${src.height}`, height: "100%", maxWidth: "100%" }}>
-            <img src={srcUrl} alt="" className="size-full object-contain" draggable={false} />
+          <div ref={box} className="relative touch-none select-none">
+            <img src={srcUrl} alt="" className="block max-h-[55vh] max-w-full" draggable={false} />
             <svg className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 1 1" preserveAspectRatio="none">
               <polygon
                 points={s.corners.map((p) => `${p.x},${p.y}`).join(" ")}
