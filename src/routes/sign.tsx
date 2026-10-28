@@ -107,8 +107,8 @@ function SignPage() {
 
   async function chooseSignature(file?: File) {
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      toast.error(ar ? "اختر صورة PNG أو JPG أو WebP." : "Choose a PNG, JPG, or WebP image.");
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      toast.error(ar ? "اختر صورة PNG أو JPG." : "Choose a PNG or JPG image.");
       return;
     }
     const data = await new Promise<string>((resolve, reject) => {
