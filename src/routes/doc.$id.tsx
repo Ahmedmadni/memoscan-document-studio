@@ -27,7 +27,7 @@ import {
   type DocRecord,
   type PageRecord,
 } from "@/lib/db";
-import { addFilesToDoc, insertAfter, movePage, removeId } from "@/lib/docOps";
+import { addFilesToDoc, insertAfter, movePage, reinsertAt, removeId } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
