@@ -59,8 +59,11 @@ export const Route = createFileRoute("/doc/$id")({
         name: "description",
         content: "Edit scanned pages, prepare PDFs and sign documents on your device.",
       },
-      { property: "og:title", content: "Document — MemoScan" },
-      { property: "og:description", content: "Private on-device document editing, scanning and PDF signing." },
+      { property: "og:title", content: "Document — Waraqah" },
+      {
+        property: "og:description",
+        content: "Private on-device document editing, scanning and PDF signing.",
+      },
     ],
   }),
   component: DocPage,
