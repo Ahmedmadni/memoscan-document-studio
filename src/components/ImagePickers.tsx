@@ -215,7 +215,11 @@ export function ImagePickers({
             >
               {t("cancel")}
             </Button>
-            <Button className="rounded-full" onClick={capture} disabled={!!cameraError || !cameraReady}>
+            <Button
+              className="rounded-full"
+              onClick={capture}
+              disabled={!!cameraError || !cameraReady}
+            >
               <Camera /> {t("capturePage")}
             </Button>
             <Button onClick={acceptCaptured} disabled={!captured.length}>
