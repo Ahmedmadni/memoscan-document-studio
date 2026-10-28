@@ -34,15 +34,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
-import {
-  getDoc,
-  getPages,
-  putDoc,
-  putPage,
-  uid,
-  type DocRecord,
-  type PageRecord,
-} from "@/lib/db";
+import { getDoc, getPages, putDoc, putPage, uid, type DocRecord, type PageRecord } from "@/lib/db";
 import { addFilesToDoc, insertAfter, movePage, reorderPages } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";

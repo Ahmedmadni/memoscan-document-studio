@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDoc, getDoc, getPage, getPages, putDoc, putPage, type PageRecord } from "@/lib/db";
 import { movePage, reorderPages } from "@/lib/docOps";
 import { defaultSettings } from "@/lib/imaging";
@@ -36,6 +36,7 @@ describe("PendingDeletes integration", () => {
 
   it("restores the page at its original position when undone before the timeout", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     const next = pd.softDelete(doc.pageIds, "b");
     expect(next).toEqual(["a", "c"]);
@@ -53,6 +54,7 @@ describe("PendingDeletes integration", () => {
 
   it("permanently removes the page record when the timeout expires", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     const next = pd.softDelete(doc.pageIds, "b");
     await putDoc({ ...doc, pageIds: next });
@@ -67,6 +69,7 @@ describe("PendingDeletes integration", () => {
 
   it("restores only the undone page when two deletes are pending", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     let order = pd.softDelete(doc.pageIds, "b");
     order = pd.softDelete(order, "c");
@@ -86,6 +89,7 @@ describe("PendingDeletes integration", () => {
 
   it("undo after reordering inserts at the intended index without reverting the reorder", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     let order = pd.softDelete(doc.pageIds, "b"); // ["a", "c"]
     order = movePage(order, 0, 1); // user reorders: ["c", "a"]
@@ -101,6 +105,7 @@ describe("PendingDeletes integration", () => {
 
   it("duplicate timeouts and repeated finalize calls delete at most once", async () => {
     const doc = await seedDoc(["a", "b"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     pd.softDelete(doc.pageIds, "b");
     // A second softDelete for the same id must not schedule another timer.
@@ -116,6 +121,7 @@ describe("PendingDeletes integration", () => {
 
   it("dispose finalizes pending deletes without corrupting the stored order", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     const next = pd.softDelete(doc.pageIds, "b");
     await putDoc({ ...doc, pageIds: next });
@@ -132,6 +138,7 @@ describe("PendingDeletes integration", () => {
 
   it("a finalized deletion stays deleted after reopening the document", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     const next = pd.softDelete(doc.pageIds, "a");
     await putDoc({ ...doc, pageIds: next });
@@ -144,6 +151,7 @@ describe("PendingDeletes integration", () => {
 
   it("keeps pageIds and page records consistent, with no orphans or missing references", async () => {
     const doc = await seedDoc(["a", "b", "c", "d"]);
+    fakeTimers();
     const pd = new PendingDeletes(6000);
     let order = pd.softDelete(doc.pageIds, "b");
     order = pd.softDelete(order, "d");
