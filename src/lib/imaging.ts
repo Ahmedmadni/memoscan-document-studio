@@ -162,6 +162,55 @@ export function warpPerspective(src: HTMLCanvasElement, corners: Corners, maxOut
   return out;
 }
 
+/**
+ * Replace near-black border-connected artifacts left outside curved paper edges.
+ * The conservative luminance threshold and border-only flood fill avoid erasing
+ * ordinary dark text that is not connected to the output boundary.
+ */
+export function whitenBorderArtifacts(img: ImageData, threshold = 38) {
+  const { width: w, height: h, data } = img;
+  if (w < 3 || h < 3) return 0;
+  const seen = new Uint8Array(w * h);
+  const queue = new Int32Array(w * h);
+  let head = 0;
+  let tail = 0;
+  const isArtifact = (p: number) => {
+    const i = p * 4;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    return Math.max(r, g, b) < threshold && Math.max(r, g, b) - Math.min(r, g, b) < 24;
+  };
+  const add = (p: number) => {
+    if (!seen[p] && isArtifact(p)) {
+      seen[p] = 1;
+      queue[tail++] = p;
+    }
+  };
+  for (let x = 0; x < w; x++) {
+    add(x);
+    add((h - 1) * w + x);
+  }
+  for (let y = 1; y < h - 1; y++) {
+    add(y * w);
+    add(y * w + w - 1);
+  }
+  while (head < tail) {
+    const p = queue[head++];
+    const x = p % w;
+    const y = (p / w) | 0;
+    if (x > 0) add(p - 1);
+    if (x + 1 < w) add(p + 1);
+    if (y > 0) add(p - w);
+    if (y + 1 < h) add(p + w);
+  }
+  // Guard against a genuinely dark document or a nearly black scan.
+  if (tail > w * h * 0.025) return 0;
+  for (let i = 0; i < tail; i++) {
+    const p = queue[i] * 4;
+    data[p] = data[p + 1] = data[p + 2] = 255;
+  }
+  return tail;
+}
+
 /** Rotate by right angle + fine angle; uncovered areas are filled white. */
 export function rotateCanvas(src: HTMLCanvasElement, degrees: number) {
   const d = ((degrees % 360) + 360) % 360;
@@ -339,6 +388,11 @@ export function processPage(
   opts: { skipAdjust?: boolean } = {},
 ) {
   const warped = warpPerspective(src, s.corners, maxOut);
+  // Remove only small, dark regions connected to the rectified page boundary.
+  const warpedContext = ctx2d(warped);
+  const warpedPixels = warpedContext.getImageData(0, 0, warped.width, warped.height);
+  whitenBorderArtifacts(warpedPixels);
+  warpedContext.putImageData(warpedPixels, 0, 0);
   const rotated = rotateCanvas(warped, s.rotation + s.angle);
   const out = rotated === warped ? warped : rotated;
   if (opts.skipAdjust) return out;
