@@ -74,11 +74,7 @@ function DocPage() {
   if (doc === null) return <Shell><p>{t("notFound")}</p><Link to="/" className="text-primary underline">{t("back")}</Link></Shell>;
 
   const ids = doc.pageIds;
-  const move = (i: number, d: number) => {
-    const n = [...ids];
-    [n[i], n[i + d]] = [n[i + d], n[i]];
-    void run("", () => saveOrder(n));
-  };
+  const move = (i: number, d: number) => void run("", () => saveOrder(movePage(ids, i, d)));
 
   return (
     <div className="min-h-screen">
@@ -132,13 +128,22 @@ function DocPage() {
                   <IconBtn label={t("duplicate")} onClick={() => run("", async () => {
                     const copy = { ...p, id: uid(), createdAt: Date.now() };
                     await putPage(copy);
-                    const n = [...ids]; n.splice(i + 1, 0, copy.id);
-                    await saveOrder(n);
+                    await saveOrder(insertAfter(ids, i, copy.id));
                   })}><Copy /></IconBtn>
                   <IconBtn label={t("replace")} onClick={() => { replaceTarget.current = p.id; replaceInput.current?.click(); }}><RefreshCw /></IconBtn>
                   <IconBtn label={t("delete")} onClick={() => {
-                    if (!window.confirm(t("confirmDeletePage"))) return;
-                    void run("", async () => { await saveOrder(ids.filter((x) => x !== p.id)); await deletePage(p.id); });
+                    // Soft delete: page leaves the order now, record is erased only if not restored.
+                    const before = ids;
+                    let restored = false;
+                    void run("", async () => {
+                      await saveOrder(removeId(ids, p.id));
+                      toast(t("pageDeleted"), {
+                        duration: 6000,
+                        action: { label: t("undo"), onClick: () => { restored = true; void run("", () => saveOrder(before)); } },
+                        onAutoClose: () => { if (!restored) void deletePage(p.id); },
+                        onDismiss: () => { if (!restored) void deletePage(p.id); },
+                      });
+                    });
                   }}><Trash2 className="text-destructive" /></IconBtn>
                 </div>
               </li>

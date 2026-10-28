@@ -44,3 +44,22 @@ export function defaultDocName(prefix: string, lang: string) {
     { hour: "2-digit", minute: "2-digit" },
   )}`;
 }
+
+/** Pure page-order helpers (return new arrays; out-of-range moves are no-ops). */
+export function movePage(ids: string[], index: number, delta: number): string[] {
+  const to = index + delta;
+  if (index < 0 || index >= ids.length || to < 0 || to >= ids.length) return ids;
+  const n = [...ids];
+  [n[index], n[to]] = [n[to]!, n[index]!];
+  return n;
+}
+
+export function insertAfter(ids: string[], index: number, id: string): string[] {
+  const n = [...ids];
+  n.splice(index + 1, 0, id);
+  return n;
+}
+
+export function removeId(ids: string[], id: string): string[] {
+  return ids.filter((x) => x !== id);
+}
