@@ -35,7 +35,6 @@ import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
 import {
-  deletePage,
   getDoc,
   getPages,
   putDoc,
@@ -366,6 +365,85 @@ function DocPage() {
         />
       )}
     </div>
+  );
+}
+
+function SortablePageCard({
+  page: p,
+  index: i,
+  total,
+  onEdit,
+  onMove,
+  onDuplicate,
+  onReplace,
+  onDelete,
+}: {
+  page: PageRecord;
+  index: number;
+  total: number;
+  onEdit: () => void;
+  onMove: (delta: number) => void;
+  onDuplicate: () => void;
+  onReplace: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useI18n();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: p.id,
+  });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`overflow-hidden rounded-xl border bg-card shadow-paper ${
+        isDragging ? "z-10 opacity-60 ring-2 ring-primary" : ""
+      }`}
+    >
+      <div className="relative">
+        <button
+          className="relative block aspect-[3/4] w-full bg-muted"
+          onClick={onEdit}
+          aria-label={`${t("edit")} ${i + 1}`}
+        >
+          <img src={p.thumb} alt="" className="size-full object-contain" />
+          <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
+            {i + 1}
+          </span>
+        </button>
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label={`${t("dragToReorder")} ${i + 1}`}
+          title={t("dragToReorder")}
+          className="absolute end-1 top-1 grid size-8 cursor-grab touch-none place-items-center rounded-md bg-stage/80 text-stage-foreground active:cursor-grabbing"
+        >
+          <GripVertical className="size-4" />
+        </button>
+      </div>
+      <p className={`px-2 pt-1 text-[11px] ${p.autoDetected ? "text-success" : "text-warning"}`}>
+        {p.autoDetected ? t("autoBadge") : t("manualBadge")}
+      </p>
+      <div className="flex flex-wrap justify-center p-1">
+        <IconBtn label={t("edit")} onClick={onEdit}>
+          <Pencil />
+        </IconBtn>
+        <IconBtn label={t("moveEarlier")} disabled={i === 0} onClick={() => onMove(-1)}>
+          <ChevronUp />
+        </IconBtn>
+        <IconBtn label={t("moveLater")} disabled={i === total - 1} onClick={() => onMove(1)}>
+          <ChevronDown />
+        </IconBtn>
+        <IconBtn label={t("duplicate")} onClick={onDuplicate}>
+          <Copy />
+        </IconBtn>
+        <IconBtn label={t("replace")} onClick={onReplace}>
+          <RefreshCw />
+        </IconBtn>
+        <IconBtn label={t("delete")} onClick={onDelete}>
+          <Trash2 className="text-destructive" />
+        </IconBtn>
+      </div>
+    </li>
   );
 }
 
