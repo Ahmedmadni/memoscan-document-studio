@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "src/**"
+      - "public/**"
+      - "README.md"
       - "package.json"
       - "bun.lock"
       - "vite.config.ts"
@@ -62,6 +64,7 @@ jobs:
             exit 1
           fi
           test -s .output/public/index.html
+          test -s .output/public/memoscan-logo.svg
 
       - name: Add Android platform if missing
         run: |
@@ -81,6 +84,12 @@ jobs:
       - name: Sync Capacitor
         run: bunx cap sync android
 
+      - name: Verify Waraqah web branding is bundled
+        run: |
+          grep -R -q 'Waraqah' .output/public
+          grep -R -q 'ورقة' .output/public
+          test -s .output/public/memoscan-logo.svg
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
@@ -91,7 +100,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: memoscan-android-debug-apk
+          name: waraqah-android-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
