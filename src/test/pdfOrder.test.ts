@@ -43,7 +43,14 @@ function page(id: string): PageRecord {
 
 async function pdfBytes(ids: string[]): Promise<Uint8Array> {
   const blob = await exportPdf(ids.map(page), { quality: "medium", pageSize: "fit" });
-  return new Uint8Array(await blob.arrayBuffer());
+  // jsdom's Blob lacks arrayBuffer(); read via FileReader instead.
+  const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+  return new Uint8Array(buf);
 }
 
 function markerPositions(bytes: Uint8Array) {
