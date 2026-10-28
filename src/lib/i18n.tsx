@@ -45,6 +45,11 @@ const dict = {
   edit: { ar: "تحرير", en: "Edit" },
   moveEarlier: { ar: "تقديم", en: "Move earlier" },
   moveLater: { ar: "تأخير", en: "Move later" },
+  dragToReorder: { ar: "اسحب لإعادة الترتيب", en: "Drag to reorder" },
+  reorderHint: {
+    ar: "اسحب الصفحات لإعادة ترتيبها، أو استخدم زرَّي التقديم والتأخير.",
+    en: "Drag pages to reorder them, or use the move earlier/later buttons.",
+  },
   duplicate: { ar: "تكرار", en: "Duplicate" },
   replace: { ar: "استبدال", en: "Replace" },
   autoBadge: { ar: "حواف مكتشفة تلقائيًا", en: "Edges auto‑detected" },
