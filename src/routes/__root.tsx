@@ -77,7 +77,9 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
+    title: "ورقة | Waraqah",
     meta: [
+      { name: "description", content: "ورقة — من الورق إلى ملف جاهز في ثوانٍ. Waraqah turns paper scans into polished digital files." },
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#2f6f78" },
