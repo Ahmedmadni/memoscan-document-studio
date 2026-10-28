@@ -7,7 +7,7 @@ import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
 import { deletePage, getDoc, getPages, putDoc, putPage, uid, type DocRecord, type PageRecord } from "@/lib/db";
-import { addFilesToDoc } from "@/lib/docOps";
+import { addFilesToDoc, insertAfter, movePage, removeId } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
