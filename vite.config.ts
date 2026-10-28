@@ -12,10 +12,4 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  nitro: {
-    // Prerender the shell so dist/client contains a static index.html —
-    // required for Capacitor's WebView (webDir: dist/client). Dynamic routes
-    // such as /doc/$id render client-side from this shell.
-    prerender: { routes: ["/", "/privacy"] },
-  },
 });
