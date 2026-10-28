@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyHomography,
   flattenPaperLighting,
+  whitenBorderArtifacts,
   isConvexQuad,
   otsu,
   solveHomography,
@@ -51,6 +52,22 @@ describe("imaging", () => {
     flattenPaperLighting(img);
     expect(img.data[0]).toBeGreaterThan(before);
     expect(img.data[3]).toBe(255);
+  });
+  it("whitens small black artifacts touching the page edge but preserves isolated text", () => {
+    const data = new Uint8ClampedArray(20 * 20 * 4);
+    for (let i = 0; i < data.length; i += 4) data.set([255, 255, 255, 255], i);
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < 2; x++) {
+        const i = (y * 20 + x) * 4;
+        data.set([0, 0, 0, 255], i);
+      }
+    }
+    const center = (10 * 20 + 10) * 4;
+    data.set([0, 0, 0, 255], center);
+    const img = { width: 20, height: 20, data } as ImageData;
+    expect(whitenBorderArtifacts(img)).toBe(6);
+    expect(img.data[0]).toBe(255);
+    expect(img.data[center]).toBe(0);
   });
   it("rejects a self-intersecting quad", () => {
     expect(isConvexQuad(FULL_CORNERS)).toBe(true);
