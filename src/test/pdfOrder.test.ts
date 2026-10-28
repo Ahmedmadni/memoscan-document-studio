@@ -20,7 +20,7 @@ vi.mock("@/lib/imaging", async (importOriginal) => {
   return {
     ...actual,
     loadImageCanvas: async (blob: Blob) => {
-      const key = blob.type;
+      const key = blob.type.toUpperCase();
       return { width: 40, height: 60, toDataURL: () => URLS[key] };
     },
   };
