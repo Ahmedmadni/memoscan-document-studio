@@ -27,7 +27,10 @@ export const Route = createFileRoute("/")({
           "Scan, straighten and enhance documents into multi-page PDFs — fully on your device.",
       },
       { property: "og:title", content: "Waraqah — ورقة" },
-      { property: "og:description", content: "Private document workspace for scanning pages and signing PDFs on-device." },
+      {
+        property: "og:description",
+        content: "Private document workspace for scanning pages and signing PDFs on-device.",
+      },
     ],
   }),
   component: Home,
