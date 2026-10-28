@@ -21,6 +21,7 @@ const dict = {
   open: { ar: "فتح", en: "Open" },
   delete: { ar: "حذف", en: "Delete" },
   confirmDeleteDoc: { ar: "حذف هذا المستند وكل صفحاته نهائيًا؟", en: "Delete this document and all its pages permanently?" },
+  pageDeleted: { ar: "تم حذف الصفحة", en: "Page deleted" },
   confirmDeletePage: { ar: "حذف هذه الصفحة؟", en: "Delete this page?" },
   loading: { ar: "جارٍ التحميل…", en: "Loading…" },
   processing: { ar: "جارٍ المعالجة", en: "Processing" },
