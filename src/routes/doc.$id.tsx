@@ -150,6 +150,39 @@ function DocPage() {
 
   const ids = doc.pageIds;
   const move = (i: number, d: number) => void run("", () => saveOrder(movePage(ids, i, d)));
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    const next = reorderPages(ids, from, to);
+    if (next !== ids) void run("", () => saveOrder(next));
+  };
+  const softDeletePage = (p: PageRecord, index: number) => {
+    const manager = pendingDeletes.current!;
+    void run("", async () => {
+      const next = manager.softDelete(ids, p.id);
+      if (next === ids) return;
+      await saveOrder(next);
+      const finalize = () => void manager.finalize(p.id);
+      toast(t("pageDeleted"), {
+        duration: 6000,
+        action: {
+          label: t("undo"),
+          onClick: () => {
+            void run("", async () => {
+              const fresh = await getDoc(doc.id);
+              if (!fresh) return;
+              const restored = manager.undo(fresh.pageIds, p.id);
+              if (restored) await saveOrder(restored, fresh);
+            });
+          },
+        },
+        onAutoClose: finalize,
+        onDismiss: finalize,
+      });
+    });
+  };
 
   return (
     <div className="min-h-screen">
