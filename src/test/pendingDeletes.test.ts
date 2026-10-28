@@ -29,7 +29,9 @@ async function seedDoc(ids: string[]) {
 }
 
 describe("PendingDeletes integration", () => {
-  beforeEach(() => vi.useFakeTimers());
+  // Fake only the timeout timers — fake-indexeddb needs real scheduling.
+  // Enable after seeding so database setup is never stalled.
+  const fakeTimers = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   afterEach(() => vi.useRealTimers());
 
   it("restores the page at its original position when undone before the timeout", async () => {
