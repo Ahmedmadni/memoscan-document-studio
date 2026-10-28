@@ -232,98 +232,37 @@ function DocPage() {
             {t("noPages")}
           </p>
         ) : (
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {pages.map((p, i) => (
-              <li key={p.id} className="overflow-hidden rounded-xl border bg-card shadow-paper">
-                <button
-                  className="relative block aspect-[3/4] w-full bg-muted"
-                  onClick={() => setEditing(p)}
-                  aria-label={`${t("edit")} ${i + 1}`}
-                >
-                  <img src={p.thumb} alt="" className="size-full object-contain" />
-                  <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
-                    {i + 1}
-                  </span>
-                </button>
-                <p
-                  className={`px-2 pt-1 text-[11px] ${p.autoDetected ? "text-success" : "text-warning"}`}
-                >
-                  {p.autoDetected ? t("autoBadge") : t("manualBadge")}
-                </p>
-                <div className="flex flex-wrap justify-center p-1">
-                  <IconBtn label={t("edit")} onClick={() => setEditing(p)}>
-                    <Pencil />
-                  </IconBtn>
-                  <IconBtn label={t("moveEarlier")} disabled={i === 0} onClick={() => move(i, -1)}>
-                    <ChevronUp />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("moveLater")}
-                    disabled={i === pages.length - 1}
-                    onClick={() => move(i, 1)}
-                  >
-                    <ChevronDown />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("duplicate")}
-                    onClick={() =>
-                      run("", async () => {
-                        const copy = { ...p, id: uid(), createdAt: Date.now() };
-                        await putPage(copy);
-                        await saveOrder(insertAfter(ids, i, copy.id));
-                      })
-                    }
-                  >
-                    <Copy />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("replace")}
-                    onClick={() => {
-                      replaceTarget.current = p.id;
-                      replaceInput.current?.click();
-                    }}
-                  >
-                    <RefreshCw />
-                  </IconBtn>
-                  <IconBtn
-                    label={t("delete")}
-                    onClick={() => {
-                      // Soft delete: the page leaves the order now; its record is erased only
-                      // when the toast ends without an undo. Pending deletes are tracked by id
-                      // so undo re-inserts at the original index in the *current* order and
-                      // each toast finalizes at most once.
-                      const index = i;
-                      void run("", async () => {
-                        pendingDeletes.current.set(p.id, index);
-                        await saveOrder(removeId(ids, p.id));
-                        const finalize = () => {
-                          if (pendingDeletes.current.delete(p.id)) void deletePage(p.id);
-                        };
-                        toast(t("pageDeleted"), {
-                          duration: 6000,
-                          action: {
-                            label: t("undo"),
-                            onClick: () => {
-                              if (!pendingDeletes.current.delete(p.id)) return;
-                              void run("", async () => {
-                                const fresh = await getDoc(doc.id);
-                                if (fresh)
-                                  await saveOrder(reinsertAt(fresh.pageIds, index, p.id), fresh);
-                              });
-                            },
-                          },
-                          onAutoClose: finalize,
-                          onDismiss: finalize,
-                        });
-                      });
-                    }}
-                  >
-                    <Trash2 className="text-destructive" />
-                  </IconBtn>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={ids} strategy={rectSortingStrategy}>
+                <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {pages.map((p, i) => (
+                    <SortablePageCard
+                      key={p.id}
+                      page={p}
+                      index={i}
+                      total={pages.length}
+                      onEdit={() => setEditing(p)}
+                      onMove={(d) => move(i, d)}
+                      onDuplicate={() =>
+                        run("", async () => {
+                          const copy = { ...p, id: uid(), createdAt: Date.now() };
+                          await putPage(copy);
+                          await saveOrder(insertAfter(ids, i, copy.id));
+                        })
+                      }
+                      onReplace={() => {
+                        replaceTarget.current = p.id;
+                        replaceInput.current?.click();
+                      }}
+                      onDelete={() => softDeletePage(p, i)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          </>
         )}
         <input
           ref={replaceInput}
