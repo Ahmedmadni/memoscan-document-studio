@@ -228,26 +228,31 @@ function DocPage() {
                   <IconBtn
                     label={t("delete")}
                     onClick={() => {
-                      // Soft delete: page leaves the order now, record is erased only if not restored.
-                      const before = ids;
-                      let restored = false;
+                      // Soft delete: the page leaves the order now; its record is erased only
+                      // when the toast ends without an undo. Pending deletes are tracked by id
+                      // so undo re-inserts at the original index in the *current* order and
+                      // each toast finalizes at most once.
+                      const index = i;
                       void run("", async () => {
+                        pendingDeletes.current.set(p.id, index);
                         await saveOrder(removeId(ids, p.id));
+                        const finalize = () => {
+                          if (pendingDeletes.current.delete(p.id)) void deletePage(p.id);
+                        };
                         toast(t("pageDeleted"), {
                           duration: 6000,
                           action: {
                             label: t("undo"),
                             onClick: () => {
-                              restored = true;
-                              void run("", () => saveOrder(before));
+                              if (!pendingDeletes.current.delete(p.id)) return;
+                              void run("", async () => {
+                                const fresh = await getDoc(doc.id);
+                                if (fresh) await saveOrder(reinsertAt(fresh.pageIds, index, p.id), fresh);
+                              });
                             },
                           },
-                          onAutoClose: () => {
-                            if (!restored) void deletePage(p.id);
-                          },
-                          onDismiss: () => {
-                            if (!restored) void deletePage(p.id);
-                          },
+                          onAutoClose: finalize,
+                          onDismiss: finalize,
                         });
                       });
                     }}
