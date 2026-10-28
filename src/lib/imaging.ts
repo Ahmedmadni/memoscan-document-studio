@@ -341,26 +341,32 @@ export function otsu(hist: ArrayLike<number>, total: number) {
   return t;
 }
 
-/**
- * Finds the largest bright region (paper is usually lighter than the background)
- * and takes its extreme points as corners. Works on a contrasting background;
- * returns `detected: false` when the result is not plausible.
- */
-export function detectDocument(src: HTMLCanvasElement): { corners: Corners; detected: boolean } {
+export type DetectMethod = "brightness" | "edges" | "none";
+export interface DetectResult {
+  corners: Corners;
+  detected: boolean;
+  method: DetectMethod;
+}
+
+/** Canvas wrapper: downscale, convert to gray, run the pure detector. */
+export function detectDocument(src: HTMLCanvasElement): DetectResult {
   const small = scaleCanvas(src, 320);
   const w = small.width;
   const h = small.height;
   const d = ctx2d(small).getImageData(0, 0, w, h).data;
   const g = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
-  // 5x5 box blur to suppress text strokes
+  return detectFromGray(g, w, h);
+}
+
+function boxBlur(g: Uint8Array, w: number, h: number, r: number) {
   const b = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let s = 0;
       let n = 0;
-      for (let dy = -2; dy <= 2; dy++)
-        for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
           const yy = y + dy;
           const xx = x + dx;
           if (yy >= 0 && yy < h && xx >= 0 && xx < w) {
@@ -370,13 +376,67 @@ export function detectDocument(src: HTMLCanvasElement): { corners: Corners; dete
         }
       b[y * w + x] = s / n;
     }
+  return b;
+}
+
+/**
+ * Two strategies, both heuristic:
+ * 1. brightness — Otsu threshold, largest bright region (light page on darker background).
+ * 2. edges — Sobel edges, flood-fill the background from the image border, keep the
+ *    enclosed region (helps with low contrast and uneven lighting).
+ * Returns `detected: false` with full-image corners when neither is plausible.
+ */
+export function detectFromGray(g: Uint8Array, w: number, h: number): DetectResult {
+  const b = boxBlur(g, w, h, 2);
   const hist = new Uint32Array(256);
   for (let i = 0; i < b.length; i++) hist[b[i]]++;
   const t = otsu(hist, b.length);
-  const mask = new Uint8Array(w * h);
-  for (let i = 0; i < b.length; i++) mask[i] = b[i] > t ? 1 : 0;
+  const bright = new Uint8Array(w * h);
+  for (let i = 0; i < b.length; i++) bright[i] = b[i] > t ? 1 : 0;
+  const c1 = cornersFromMask(bright, w, h);
+  if (c1) return { corners: c1, detected: true, method: "brightness" };
 
-  // Largest 4-connected component.
+  // Edge strategy
+  const mag = new Float32Array(w * h);
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = b[i - w + 1] + 2 * b[i + 1] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - 1] - b[i + w - 1];
+      const gy = b[i + w - 1] + 2 * b[i + w] + b[i + w + 1] - b[i - w - 1] - 2 * b[i - w] - b[i - w + 1];
+      mag[i] = Math.hypot(gx, gy);
+    }
+  const sorted = Float32Array.from(mag).sort();
+  const thr = Math.max(12, sorted[Math.floor(sorted.length * 0.88)]);
+  const edge = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (mag[i] >= thr) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) edge[i + dy * w + dx] = 1;
+    }
+  const bg = new Uint8Array(w * h);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (bg[p] || edge[p]) continue;
+    bg[p] = 1;
+    const x = p % w;
+    const y = (p / w) | 0;
+    if (x > 0) stack.push(p - 1);
+    if (x < w - 1) stack.push(p + 1);
+    if (y > 0) stack.push(p - w);
+    if (y < h - 1) stack.push(p + w);
+  }
+  const inside = new Uint8Array(w * h);
+  for (let i = 0; i < inside.length; i++) inside[i] = bg[i] ? 0 : 1;
+  const c2 = cornersFromMask(inside, w, h);
+  if (c2) return { corners: c2, detected: true, method: "edges" };
+  return { corners: FULL_CORNERS, detected: false, method: "none" };
+}
+
+/** Largest 4-connected component → extreme-point quad, or null when implausible. */
+export function cornersFromMask(mask: Uint8Array, w: number, h: number): Corners | null {
   const label = new Int32Array(w * h);
   let bestLabel = 0;
   let bestSize = 0;
@@ -394,10 +454,11 @@ export function detectDocument(src: HTMLCanvasElement): { corners: Corners; dete
       const x = p % w;
       const y = (p / w) | 0;
       const nb = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
-      for (const q of nb) if (q >= 0 && mask[q] && !label[q]) {
-        label[q] = cur;
-        stack.push(q);
-      }
+      for (const q of nb)
+        if (q >= 0 && mask[q] && !label[q]) {
+          label[q] = cur;
+          stack.push(q);
+        }
     }
     if (size > bestSize) {
       bestSize = size;
@@ -405,8 +466,7 @@ export function detectDocument(src: HTMLCanvasElement): { corners: Corners; dete
     }
   }
   const ratio = bestSize / (w * h);
-  if (!bestLabel || ratio < 0.12 || ratio > 0.97) return { corners: FULL_CORNERS, detected: false };
-
+  if (!bestLabel || ratio < 0.12 || ratio > 0.97) return null;
   let tl = { v: Infinity, x: 0, y: 0 };
   let br = { v: -Infinity, x: 0, y: 0 };
   let tr = { v: -Infinity, x: 0, y: 0 };
@@ -421,8 +481,10 @@ export function detectDocument(src: HTMLCanvasElement): { corners: Corners; dete
     if (x - y < bl.v) bl = { v: x - y, x, y };
   }
   const corners = [tl, tr, br, bl].map((p) => ({ x: p.x / (w - 1), y: p.y / (h - 1) })) as Corners;
-  if (!isConvexQuad(corners) || quadArea(corners) < 0.1) return { corners: FULL_CORNERS, detected: false };
-  return { corners, detected: true };
+  if (!isConvexQuad(corners) || quadArea(corners) < 0.1) return null;
+  // Reject a "page" that is just the whole frame.
+  if (quadArea(corners) > 0.96) return null;
+  return corners;
 }
 
 export function quadArea(c: Corners) {
