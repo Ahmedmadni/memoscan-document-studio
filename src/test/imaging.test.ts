@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applyHomography, isConvexQuad, otsu, solveHomography, FULL_CORNERS } from "@/lib/imaging";
+import {
+  applyHomography,
+  flattenPaperLighting,
+  isConvexQuad,
+  otsu,
+  solveHomography,
+  FULL_CORNERS,
+} from "@/lib/imaging";
 
 describe("imaging", () => {
   it("homography maps the four source corners onto the target quad", () => {
@@ -29,6 +36,21 @@ describe("imaging", () => {
     const t = otsu(hist, 1000);
     expect(t).toBeGreaterThanOrEqual(40);
     expect(t).toBeLessThan(200);
+  });
+  it("reduces uneven illumination while preserving image alpha", () => {
+    const data = new Uint8ClampedArray(20 * 10 * 4);
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 20; x++) {
+        const i = (y * 20 + x) * 4;
+        const v = x < 10 ? 120 : 235;
+        data.set([v, v, v, 255], i);
+      }
+    }
+    const img = { width: 20, height: 10, data } as ImageData;
+    const before = img.data[0];
+    flattenPaperLighting(img);
+    expect(img.data[0]).toBeGreaterThan(before);
+    expect(img.data[3]).toBe(255);
   });
   it("rejects a self-intersecting quad", () => {
     expect(isConvexQuad(FULL_CORNERS)).toBe(true);
