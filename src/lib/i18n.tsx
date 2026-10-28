@@ -3,10 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 export type Lang = "ar" | "en";
 
 const dict = {
-  appName: { ar: "ماسح ميمو", en: "MemoScan" },
+  appName: { ar: "ورقة", en: "Waraqah" },
   tagline: {
-    ar: "امسح مستنداتك بوضوح، وكل شيء يبقى على جهازك.",
-    en: "Crisp document scans that never leave your device.",
+    ar: "من الورق إلى ملف جاهز — في ثوانٍ.",
+    en: "From paper to a polished file — in seconds.",
   },
   langToggle: { ar: "English", en: "العربية" },
   privacy: { ar: "الخصوصية", en: "Privacy" },
@@ -97,7 +97,6 @@ const dict = {
     en: "Local storage isn't available in this browser.",
   },
   notFound: { ar: "المستند غير موجود.", en: "Document not found." },
-  // editor
   corners: { ar: "الزوايا", en: "Corners" },
   adjust: { ar: "التحسين", en: "Adjust" },
   autoDetect: { ar: "كشف تلقائي", en: "Auto‑detect" },
@@ -135,7 +134,6 @@ const dict = {
   cancel: { ar: "إلغاء", en: "Cancel" },
   saved: { ar: "تم الحفظ", en: "Saved" },
   reset: { ar: "إعادة الضبط", en: "Reset" },
-  // privacy
   privacyTitle: { ar: "الخصوصية والتخزين", en: "Privacy & storage" },
   privacy1: {
     ar: "تتم معالجة الصور بالكامل داخل متصفحك على جهازك. لا يتم رفع أي صورة أو مستند إلى أي خادم.",
@@ -169,7 +167,7 @@ const I18nCtx = createContext<Ctx | null>(null);
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>("ar");
   useEffect(() => {
-    const saved = localStorage.getItem("memoscan.lang");
+    const saved = localStorage.getItem("waraqah.lang");
     if (saved === "en" || saved === "ar") setLang(saved);
   }, []);
   useEffect(() => {
@@ -179,7 +177,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => {
     setLang((l) => {
       const n = l === "ar" ? "en" : "ar";
-      localStorage.setItem("memoscan.lang", n);
+      localStorage.setItem("waraqah.lang", n);
       return n;
     });
   }, []);
