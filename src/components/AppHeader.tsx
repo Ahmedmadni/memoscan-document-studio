@@ -18,7 +18,13 @@ export function AppHeader({ start }: { start?: ReactNode }) {
           </Link>
         )}
         <div className="ms-auto flex items-center gap-1">
-          <a href="https://ahmedelmadni.com" target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted" aria-label="Developer: Ahmed Elmadani">
+          <a
+            href="https://ahmedelmadni.com"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted"
+            aria-label="Developer: Ahmed Elmadani"
+          >
             <ExternalLink className="size-4" />
             <span className="hidden md:inline">Ahmed Elmadani</span>
           </a>
