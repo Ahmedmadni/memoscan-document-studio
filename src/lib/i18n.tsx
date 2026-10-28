@@ -14,13 +14,19 @@ const dict = {
   newDoc: { ar: "مستند جديد", en: "New document" },
   scanCamera: { ar: "التقاط بالكاميرا", en: "Scan with camera" },
   importImages: { ar: "استيراد صور", en: "Import images" },
-  cameraUnavailable: { ar: "تعذر فتح الكاميرا داخل التطبيق. تحقق من صلاحية الكاميرا أو استخدم استيراد الصور.", en: "Couldn't open the in-app camera. Check camera permission or import images instead." },
+  cameraUnavailable: {
+    ar: "تعذر فتح الكاميرا داخل التطبيق. تحقق من صلاحية الكاميرا أو استخدم استيراد الصور.",
+    en: "Couldn't open the in-app camera. Check camera permission or import images instead.",
+  },
   cameraStarting: { ar: "جارٍ تشغيل الكاميرا…", en: "Starting camera…" },
   capturePage: { ar: "التقاط صفحة", en: "Capture page" },
   capturedPages: { ar: "الصفحات الملتقطة", en: "Captured pages" },
   useCaptured: { ar: "مراجعة وإضافة", en: "Review & add" },
   removeCaptured: { ar: "حذف الصورة الملتقطة", en: "Remove captured image" },
-  captureFailed: { ar: "تعذر حفظ الصورة. حاول مرة أخرى.", en: "Couldn't save the photo. Please try again." },
+  captureFailed: {
+    ar: "تعذر حفظ الصورة. حاول مرة أخرى.",
+    en: "Couldn't save the photo. Please try again.",
+  },
   emptyTitle: { ar: "لا توجد مستندات بعد", en: "No documents yet" },
   emptyBody: {
     ar: "ابدأ بالتقاط صورة لورقة أو استيراد صور من جهازك.",
