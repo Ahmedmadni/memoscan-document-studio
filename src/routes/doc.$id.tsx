@@ -249,7 +249,8 @@ function DocPage() {
                               if (!pendingDeletes.current.delete(p.id)) return;
                               void run("", async () => {
                                 const fresh = await getDoc(doc.id);
-                                if (fresh) await saveOrder(reinsertAt(fresh.pageIds, index, p.id), fresh);
+                                if (fresh)
+                                  await saveOrder(reinsertAt(fresh.pageIds, index, p.id), fresh);
                               });
                             },
                           },
