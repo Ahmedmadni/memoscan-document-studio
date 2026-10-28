@@ -316,7 +316,8 @@ function adaptiveThreshold(img: ImageData, offset: number) {
 
 export function applyAdjustments(img: ImageData, s: EditSettings) {
   const d = img.data;
-  if (s.filter === "clean") flattenPaperLighting(img);\n  if (s.filter === "enhance") autoLevels(d);
+  if (s.filter === "clean") flattenPaperLighting(img);
+  if (s.filter === "enhance") autoLevels(d);
   if (s.filter === "gray" || s.filter === "bw") toGray(d);
   if (s.brightness !== 0 || s.contrast !== 0) {
     const lut = buildLut(s.brightness, s.contrast);
