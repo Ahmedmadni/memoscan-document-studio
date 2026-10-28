@@ -7,9 +7,16 @@ export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
       { title: "Privacy — MemoScan" },
-      { name: "description", content: "MemoScan processes and stores your scans only on your device. Nothing is uploaded." },
+      {
+        name: "description",
+        content:
+          "MemoScan processes and stores your scans only on your device. Nothing is uploaded.",
+      },
       { property: "og:title", content: "Privacy — MemoScan" },
-      { property: "og:description", content: "On-device processing, local storage, no uploads, no accounts." },
+      {
+        property: "og:description",
+        content: "On-device processing, local storage, no uploads, no accounts.",
+      },
     ],
   }),
   component: Privacy,

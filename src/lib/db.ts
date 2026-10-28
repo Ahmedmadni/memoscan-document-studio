@@ -112,7 +112,8 @@ export async function deleteDoc(id: string) {
 /** Ask the browser not to evict our data under storage pressure. */
 export async function requestPersistence() {
   try {
-    if (navigator.storage?.persist && !(await navigator.storage.persisted())) await navigator.storage.persist();
+    if (navigator.storage?.persist && !(await navigator.storage.persisted()))
+      await navigator.storage.persist();
   } catch {
     /* not supported */
   }
