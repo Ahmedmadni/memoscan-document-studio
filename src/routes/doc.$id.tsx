@@ -54,13 +54,13 @@ import {
 export const Route = createFileRoute("/doc/$id")({
   head: () => ({
     meta: [
-      { title: "Document — MemoScan" },
+      { title: "Document — Waraqah" },
       {
         name: "description",
-        content: "Edit pages, fix perspective and export a PDF on your device.",
+        content: "Edit scanned pages, prepare PDFs and sign documents on your device.",
       },
       { property: "og:title", content: "Document — MemoScan" },
-      { property: "og:description", content: "On-device scan editing and PDF export." },
+      { property: "og:description", content: "Private on-device document editing, scanning and PDF signing." },
     ],
   }),
   component: DocPage,
