@@ -10,7 +10,7 @@ import {
   putPage,
   type PageRecord,
 } from "@/lib/db";
-import { insertAfter, movePage, removeId } from "@/lib/docOps";
+import { insertAfter, movePage, reinsertAt, removeId } from "@/lib/docOps";
 import {
   applyAdjustments,
   buildLut,

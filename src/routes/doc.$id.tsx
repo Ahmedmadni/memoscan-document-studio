@@ -69,6 +69,8 @@ function DocPage() {
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
+  // pageId -> original index, for soft deletes awaiting undo or finalization.
+  const pendingDeletes = useRef(new Map<string, number>());
 
   const load = useCallback(async () => {
     try {
