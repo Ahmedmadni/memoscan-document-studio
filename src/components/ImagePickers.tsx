@@ -18,6 +18,7 @@ export function ImagePickers({
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [captured, setCaptured] = useState<File[]>([]);
   const previews = useMemo(
@@ -31,6 +32,7 @@ export function ImagePickers({
     if (!cameraOpen) {
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
+      setCameraReady(false);
       return;
     }
     let active = true;
@@ -49,6 +51,7 @@ export function ImagePickers({
         if (video.current) {
           video.current.srcObject = media;
           await video.current.play();
+          setCameraReady(true);
         }
       } catch {
         if (active) setCameraError(t("cameraUnavailable"));
@@ -60,6 +63,7 @@ export function ImagePickers({
       active = false;
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
+      setCameraReady(false);
     };
   }, [cameraOpen, t]);
 
@@ -154,7 +158,7 @@ export function ImagePickers({
 
           <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-white/15 px-4 py-4">
             <Button variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white" onClick={closeCamera}>{t("cancel")}</Button>
-            <Button className="rounded-full" onClick={capture} disabled={!!cameraError || !stream.current}>
+            <Button className="rounded-full" onClick={capture} disabled={!!cameraError || !cameraReady}>
               <Camera /> {t("capturePage")}
             </Button>
             <Button onClick={acceptCaptured} disabled={!captured.length}>
