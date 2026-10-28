@@ -115,6 +115,7 @@ const dict = {
   fEnhance: { ar: "تحسين الألوان", en: "Enhance" },
   fGray: { ar: "رمادي", en: "Grayscale" },
   fBw: { ar: "أبيض وأسود", en: "Black & white" },
+  fClean: { ar: "تنظيف ظلال الورق", en: "Paper shadow cleanup" },
   brightness: { ar: "السطوع", en: "Brightness" },
   contrast: { ar: "التباين", en: "Contrast" },
   sharpen: { ar: "الحدة", en: "Sharpen" },
