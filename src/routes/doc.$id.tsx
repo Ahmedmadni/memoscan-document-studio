@@ -1,3 +1,19 @@
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -5,6 +21,7 @@ import {
   ChevronUp,
   Copy,
   Download,
+  GripVertical,
   Loader2,
   Pencil,
   RefreshCw,
@@ -27,10 +44,11 @@ import {
   type DocRecord,
   type PageRecord,
 } from "@/lib/db";
-import { addFilesToDoc, insertAfter, movePage, reinsertAt, removeId } from "@/lib/docOps";
+import { addFilesToDoc, insertAfter, movePage, reorderPages } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
+import { PendingDeletes } from "@/lib/pendingDeletes";
 import {
   canShareFile,
   downloadBlob,
@@ -69,8 +87,15 @@ function DocPage() {
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
-  // pageId -> original index, for soft deletes awaiting undo or finalization.
-  const pendingDeletes = useRef(new Map<string, number>());
+  // Soft deletes awaiting undo or finalization; finalized on unmount.
+  const pendingDeletes = useRef<PendingDeletes | null>(null);
+  pendingDeletes.current ??= new PendingDeletes(6000);
+  useEffect(() => () => pendingDeletes.current?.dispose(), []);
+  // A small movement threshold keeps taps (open editor) from starting a drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const load = useCallback(async () => {
     try {
