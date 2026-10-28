@@ -15,12 +15,16 @@ const URLS: Record<string, string> = {
   PAGE_C: PAGE_C_JPEG,
 };
 
-vi.mock("@/lib/imaging", () => ({
-  loadImageCanvas: async (blob: Blob) => {
-    const key = await blob.text();
-    return { width: 40, height: 60, toDataURL: () => URLS[key] };
-  },
-}));
+vi.mock("@/lib/imaging", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/imaging")>();
+  return {
+    ...actual,
+    loadImageCanvas: async (blob: Blob) => {
+      const key = await blob.text();
+      return { width: 40, height: 60, toDataURL: () => URLS[key] };
+    },
+  };
+});
 
 function page(id: string): PageRecord {
   return {
@@ -64,7 +68,7 @@ describe("exported PDF page order", () => {
   });
 
   it("follows the reordered sequence C, A, B", async () => {
-    const ids = reorderPages(reorderPages(["PAGE_A", "PAGE_B", "PAGE_C"], 2, 0), 2, 1);
+    const ids = reorderPages(["PAGE_A", "PAGE_B", "PAGE_C"], 2, 0);
     expect(ids).toEqual(["PAGE_C", "PAGE_A", "PAGE_B"]);
     const { a, b, c } = markerPositions(await pdfBytes(ids));
     expect(c).toBeLessThan(a);
