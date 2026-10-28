@@ -51,6 +51,15 @@ describe("page order helpers", () => {
     expect(insertAfter(["a", "b"], 0, "a2")).toEqual(["a", "a2", "b"]);
     expect(removeId(["a", "b", "c"], "b")).toEqual(["a", "c"]);
   });
+  it("undo re-inserts at the original index in the current order", () => {
+    // Delete "b" at index 1, then delete "c"; undoing "b" must not resurrect "c".
+    const afterTwoDeletes = removeId(removeId(["a", "b", "c"], "b"), "c");
+    expect(reinsertAt(afterTwoDeletes, 1, "b")).toEqual(["a", "b"]);
+  });
+  it("undo clamps the index when the list shrank and never duplicates the id", () => {
+    expect(reinsertAt(["a"], 5, "b")).toEqual(["a", "b"]);
+    expect(reinsertAt(["a", "b"], 0, "b")).toEqual(["b", "a"]);
+  });
 });
 
 describe("IndexedDB persistence", () => {
