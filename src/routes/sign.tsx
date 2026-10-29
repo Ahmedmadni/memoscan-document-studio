@@ -197,7 +197,16 @@ function SignPage() {
           </section>
         )}
 
-        {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{ar ? "معاينة التوقيع" : "Signature preview"}</span><img src={signature} alt={ar ? "معاينة التوقيع" : "Signature preview"} onLoad={(e) => setSignatureAspect(e.currentTarget.naturalWidth > 0 ? e.currentTarget.naturalHeight / e.currentTarget.naturalWidth : 220 / 900)} className="h-16 max-w-56 object-contain" /><Button variant="ghost" size="sm" onClick={() => setSignature(null)}>{ar ? "إزالة" : "Remove"}</Button></section>}
+        {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{ar ? "معاينة التوقيع" : "Signature preview"}</span><img src={signature} alt={ar ? "معاينة التوقيع" : "Signature preview"} onLoad={(e) => {
+            const aspect = e.currentTarget.naturalWidth > 0 ? e.currentTarget.naturalHeight / e.currentTarget.naturalWidth : 220 / 900;
+            setSignatureAspect(aspect);
+            setPlacement((p) => {
+              const canvas = previewRef.current;
+              const pageAspect = canvas && canvas.height > 0 ? canvas.width / canvas.height : 1;
+              const heightFraction = p.width * aspect / pageAspect;
+              return { ...p, x: Math.min(p.x, 1 - p.width), y: Math.max(0, Math.min(p.y, 1 - heightFraction)) };
+            });
+          }} className="h-16 max-w-56 object-contain" /><Button variant="ghost" size="sm" onClick={() => setSignature(null)}>{ar ? "إزالة" : "Remove"}</Button></section>}
 
         {pdfBytes && (
           <section className="rounded-2xl border bg-card p-4">
