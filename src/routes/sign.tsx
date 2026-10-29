@@ -1,236 +1,139 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PDFDocument } from "pdf-lib";
 import { ArrowLeft, Download, Eraser, FileSignature, ImagePlus, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { downloadBlob } from "@/lib/pdf";
+import { clampPlacement, createSignedPdf, displaySize, hasSignatureInk, INITIAL_PLACEMENT, loadSigningPdf, readSignatureImage, type PageGeometry, type SignatureImage } from "@/lib/signature";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/sign")({
-  head: () => ({ meta: [{ title: "Waraqah — Add signature" }] }),
-  component: SignPage,
+  head: () => ({ meta: [
+    { title: "Waraqah — Add signature" },
+    { name: "description", content: "Add a visual signature to a selected PDF page privately on your device." },
+    { property: "og:title", content: "Waraqah — Add signature" },
+    { property: "og:description", content: "Draw or import a signature and export a separate signed PDF on-device." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" },
+  ] }), component: SignPage,
 });
 
-function SignPage() {
-  const { lang } = useI18n();
-  const ar = lang === "ar";
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
-  const [pageCount, setPageCount] = useState(0);
+export function SignPage() {
+  const { t } = useI18n();
+  const [pdf, setPdf] = useState<{ name: string; bytes: Uint8Array; pages: PageGeometry[] } | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
-  const [signature, setSignature] = useState<string | null>(null);
-  const [signatureMode, setSignatureMode] = useState<"draw" | "image">("draw");
-  const [placement, setPlacement] = useState({ x: 0.62, y: 0.72, width: 0.23 });
-  const [signatureAspect, setSignatureAspect] = useState(220 / 900);
+  const [signature, setSignature] = useState<SignatureImage | null>(null);
+  const [mode, setMode] = useState<"draw" | "image">("draw");
+  const [placement, setPlacement] = useState(INITIAL_PLACEMENT);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [preview, setPreview] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const dragRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const drawing = useRef(false);
+  const drag = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const revision = useRef({ pdf: 0, image: 0 });
+  const page = pdf?.pages[pageIndex];
+  const safe = page && signature ? clampPlacement(placement, signature.aspect, page) : placement;
 
   useEffect(() => {
-    if (!pdfBytes || !previewRef.current) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        const doc = await pdfjs.getDocument({ data: pdfBytes.slice(), disableWorker: true }).promise;
-        if (cancelled) return;
-        setPageCount(doc.numPages);
-        const page = await doc.getPage(pageIndex + 1);
-        const canvas = previewRef.current;
-        if (!canvas) return;
-        const base = page.getViewport({ scale: 1 });
-        const scale = Math.min(760 / base.width, 920 / base.height, 1.5);
-        const viewport = page.getViewport({ scale });
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport }).promise;
-      } catch {
-        toast.error(ar ? "تعذر عرض هذا الملف. تأكد أنه PDF صالح وغير محمي." : "Couldn't preview this PDF. Check that it is valid and not password-protected.");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [pdfBytes, pageIndex, ar]);
-
-  function startDraw(event: React.PointerEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    canvas.setPointerCapture(event.pointerId);
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo((event.clientX - rect.left) * canvas.width / rect.width, (event.clientY - rect.top) * canvas.height / rect.height);
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#142b55";
-    dragRef.current = { x: event.clientX, y: event.clientY, startX: 0, startY: 0 };
-  }
-
-  function moveDraw(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (!dragRef.current || signatureMode !== "draw") return;
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineTo((event.clientX - rect.left) * canvas.width / rect.width, (event.clientY - rect.top) * canvas.height / rect.height);
-    ctx.stroke();
-  }
-
-  function endDraw() {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    const canvas = canvasRef.current;
-    if (canvas) setSignature(canvas.toDataURL("image/png"));
-  }
+    if (!pdf || !previewRef.current) return;
+    const controller = new AbortController();
+    const canvas = previewRef.current;
+    setPreview("loading");
+    void import("@/lib/signature-preview").then(({ renderSigningPage }) => renderSigningPage(pdf.bytes, pageIndex, canvas, controller.signal)).then(() => {
+      if (!controller.signal.aborted) setPreview("ready");
+    }).catch(() => { if (!controller.signal.aborted) setPreview("error"); });
+    return () => controller.abort();
+  }, [pdf, pageIndex]);
 
   async function choosePdf(file?: File) {
     if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error(ar ? "اختر ملف PDF صالحًا." : "Choose a valid PDF file.");
-      return;
-    }
+    const id = ++revision.current.pdf;
+    setImporting(true); setError(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const parsed = await PDFDocument.load(bytes, { ignoreEncryption: false });
-      setPdfFile(file);
-      setPdfBytes(bytes);
-      setPageCount(parsed.getPageCount());
-      setPageIndex(0);
-      setPlacement({ x: 0.62, y: 0.72, width: 0.23 });
-    } catch {
-      toast.error(ar ? "تعذر فتح PDF. قد يكون الملف تالفًا أو محميًا بكلمة مرور." : "Couldn't open this PDF. It may be damaged or password-protected.");
-    }
+      const pages = await loadSigningPdf(bytes);
+      if (id !== revision.current.pdf) return;
+      setPdf({ name: file.name, bytes, pages }); setPageIndex(0);
+      setPlacement(INITIAL_PLACEMENT); setPreview("loading");
+    } catch { if (id === revision.current.pdf) setError(t("signBadPdf")); }
+    finally { if (id === revision.current.pdf) setImporting(false); }
   }
 
-  async function chooseSignature(file?: File) {
+  async function chooseImage(file?: File) {
     if (!file) return;
-    if (!["image/png", "image/jpeg"].includes(file.type)) {
-      toast.error(ar ? "اختر صورة PNG أو JPG." : "Choose a PNG or JPG image.");
-      return;
-    }
-    const data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("READ_FAILED"));
-      reader.onerror = () => reject(new Error("READ_FAILED"));
-      reader.readAsDataURL(file);
-    });
-    setSignature(data);
-    setSignatureMode("image");
-  }
-
-  function signatureHeightFraction(width: number) {
-    const canvas = previewRef.current;
-    const pageAspect = canvas && canvas.height > 0 ? canvas.width / canvas.height : 1;
-    return width * signatureAspect / pageAspect;
-  }
-
-  async function exportSignedPdf() {
-    if (!pdfBytes || !signature) return;
-    setBusy(true);
+    const id = ++revision.current.image;
+    setImporting(true); setError(null);
     try {
-      const pdf = await PDFDocument.load(pdfBytes);
-      const page = pdf.getPage(pageIndex);
-      const png = await fetch(signature).then((response) => response.arrayBuffer());
-      const image = signature.startsWith("data:image/png") ? await pdf.embedPng(png) : await pdf.embedJpg(png);
-      const { width, height } = page.getSize();
-      const drawWidth = width * placement.width;
-      const drawHeight = drawWidth * image.height / image.width;
-      page.drawImage(image, {
-        x: width * placement.x,
-        y: height * (1 - placement.y) - drawHeight,
-        width: drawWidth,
-        height: drawHeight,
-      });
-      const bytes = await pdf.save();
-      const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = (pdfFile?.name.replace(/\.pdf$/i, "") || "document") + "-signed.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(ar ? "تم تصدير نسخة موقعة، والأصل لم يتغير." : "Signed copy exported. The original file was not changed.");
-    } catch {
-      toast.error(ar ? "تعذر تصدير النسخة الموقعة." : "Couldn't export the signed copy.");
-    } finally {
-      setBusy(false);
-    }
+      const image = await readSignatureImage(file);
+      if (id !== revision.current.image) return;
+      setSignature(image); setMode("image");
+    } catch (e) { if (id === revision.current.image) setError(t(e instanceof Error && e.message === "BLANK_SIGNATURE" ? "signBlank" : "signBadImage")); }
+    finally { if (id === revision.current.image) setImporting(false); }
   }
 
-  return (
-    <div className="min-h-screen">
-      <AppHeader />
-      <main className="mx-auto max-w-6xl px-4 pb-16">
-        <div className="mb-6 flex items-center gap-3 pt-6">
-          <Button variant="ghost" size="icon" asChild><Link to="/"><ArrowLeft /></Link></Button>
-          <div>
-            <h1 className="text-2xl font-bold">{ar ? "إضافة التوقيعات" : "Add signature"}</h1>
-            <p className="text-sm text-muted-foreground">{ar ? "اختر PDF ثم ارسم توقيعك أو استورد صورة جاهزة." : "Choose a PDF, then draw a signature or import a ready image."}</p>
-          </div>
-        </div>
-
-        <section className="mb-6 grid gap-4 rounded-2xl border bg-card p-4 md:grid-cols-2">
-          <div>
-            <h2 className="mb-2 font-semibold">{ar ? "1. ملف PDF" : "1. PDF document"}</h2>
-            <input ref={fileInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => void choosePdf(e.target.files?.[0])} />
-            <Button onClick={() => fileInputRef.current?.click()}><Upload className="me-2 size-4" />{pdfFile ? pdfFile.name : ar ? "اختيار ملف PDF" : "Choose PDF"}</Button>
-            <p className="mt-2 text-xs text-muted-foreground">{ar ? "يظل الملف الأصلي كما هو؛ سنصدر نسخة جديدة." : "Your original stays unchanged; a new copy will be exported."}</p>
-          </div>
-          <div>
-            <h2 className="mb-2 font-semibold">{ar ? "2. مصدر التوقيع" : "2. Signature source"}</h2>
-            <div className="flex flex-wrap gap-2">
-              <Button variant={signatureMode === "draw" ? "default" : "outline"} onClick={() => setSignatureMode("draw")}><FileSignature className="me-2 size-4" />{ar ? "ارسم توقيعًا" : "Draw signature"}</Button>
-              <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => void chooseSignature(e.target.files?.[0])} />
-              <Button variant="outline" onClick={() => imageInputRef.current?.click()}><ImagePlus className="me-2 size-4" />{ar ? "استيراد من الصور" : "Import from photos"}</Button>
-            </div>
-          </div>
-        </section>
-
-        {signatureMode === "draw" && (
-          <section className="mb-6 rounded-2xl border bg-card p-4">
-            <div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">{ar ? "ارسم داخل المساحة" : "Draw in the box"}</h2><Button size="sm" variant="ghost" onClick={() => { const c = canvasRef.current; c?.getContext("2d")?.clearRect(0,0,c.width,c.height); setSignature(null); }}><Eraser className="me-2 size-4" />{ar ? "مسح" : "Clear"}</Button></div>
-            <canvas ref={canvasRef} width={900} height={220} className="w-full touch-none rounded-xl border bg-white" style={{ height: 180 }} onPointerDown={startDraw} onPointerMove={moveDraw} onPointerUp={endDraw} onPointerCancel={endDraw} />
-          </section>
-        )}
-
-        {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{ar ? "معاينة التوقيع" : "Signature preview"}</span><img src={signature} alt={ar ? "معاينة التوقيع" : "Signature preview"} onLoad={(e) => {
-            const aspect = e.currentTarget.naturalWidth > 0 ? e.currentTarget.naturalHeight / e.currentTarget.naturalWidth : 220 / 900;
-            setSignatureAspect(aspect);
-            setPlacement((p) => {
-              const canvas = previewRef.current;
-              const pageAspect = canvas && canvas.height > 0 ? canvas.width / canvas.height : 1;
-              const heightFraction = p.width * aspect / pageAspect;
-              return { ...p, x: Math.min(p.x, 1 - p.width), y: Math.max(0, Math.min(p.y, 1 - heightFraction)) };
-            });
-          }} className="h-16 max-w-56 object-contain" /><Button variant="ghost" size="sm" onClick={() => setSignature(null)}>{ar ? "إزالة" : "Remove"}</Button></section>}
-
-        {pdfBytes && (
-          <section className="rounded-2xl border bg-card p-4">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="font-semibold">{ar ? "3. ضع التوقيع على الصفحة" : "3. Place the signature"}</h2><p className="text-xs text-muted-foreground">{ar ? "اسحب التوقيع لمكانه داخل الصفحة ثم صدّر النسخة." : "Drag the signature into position, then export a signed copy."}</p></div>
-              <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={pageIndex === 0} onClick={() => setPageIndex((p) => p - 1)}>{ar ? "السابقة" : "Previous"}</Button><span className="text-sm">{pageIndex + 1} / {pageCount}</span><Button variant="outline" size="sm" disabled={pageIndex + 1 >= pageCount} onClick={() => setPageIndex((p) => p + 1)}>{ar ? "التالية" : "Next"}</Button></div>
-            </div>
-            <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded border bg-muted">
-              <canvas ref={previewRef} className="block h-auto max-w-full" />
-              {signature && <img src={signature} alt="" draggable={false} onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { x: e.clientX, y: e.clientY, startX: placement.x, startY: placement.y }; }} onPointerMove={(e) => { if (!dragRef.current || !e.currentTarget.hasPointerCapture(e.pointerId)) return; const parent = e.currentTarget.parentElement; if (!parent) return; const rect = parent.getBoundingClientRect(); setPlacement((p) => {
-                  const nextX = dragRef.current!.startX + (e.clientX - dragRef.current!.x) / rect.width;
-                  const nextY = dragRef.current!.startY + (e.clientY - dragRef.current!.y) / rect.height;
-                  return { ...p, x: Math.max(0, Math.min(1 - p.width, nextX)), y: Math.max(0, Math.min(1 - signatureHeightFraction(p.width), nextY)) };
-                }); }} onPointerUp={() => { dragRef.current = null; }} className="absolute cursor-move touch-none object-contain" style={{ left: `${placement.x * 100}%`, top: `${placement.y * 100}%`, width: `${placement.width * 100}%`, height: "auto", border: "1px dashed #64748b" }} />}
-            </div>
-            <div className="mx-auto mt-4 flex max-w-xl items-center gap-3"><label htmlFor="signature-size" className="text-sm">{ar ? "حجم التوقيع" : "Signature size"}</label><input id="signature-size" type="range" min="0.1" max="0.5" step="0.01" value={placement.width} onChange={(e) => setPlacement((p) => {
-              const width = Number(e.target.value);
-              return { ...p, width, x: Math.min(p.x, 1 - width), y: Math.min(p.y, 1 - signatureHeightFraction(width)) };
-            })} className="flex-1" /></div>
-            <div className="mt-5 flex justify-end"><Button onClick={() => void exportSignedPdf()} disabled={!signature || busy}>{busy ? (ar ? "جارٍ التصدير…" : "Exporting…") : <><Download className="me-2 size-4" />{ar ? "تصدير PDF الموقّع" : "Export signed PDF"}</>}</Button></div>
-          </section>
-        )}
-        <p className="mt-5 text-xs text-muted-foreground">{ar ? "هذا توقيع بصري مضاف إلى محتوى PDF، وليس توقيعًا رقميًا تشفيريًا قائمًا على شهادة." : "This adds a visual signature to the PDF; it is not a certificate-based cryptographic digital signature."}</p>
-      </main>
-    </div>
-  );
+  function startDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current; const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    canvas.setPointerCapture(e.pointerId); drawing.current = true;
+    const r = canvas.getBoundingClientRect();
+    ctx.beginPath(); ctx.moveTo((e.clientX-r.left)*canvas.width/r.width, (e.clientY-r.top)*canvas.height/r.height);
+    ctx.lineWidth = 3.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = getComputedStyle(canvas).getPropertyValue("--signature-ink").trim();
+    setError(null);
+  }
+  function moveDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current; const ctx = canvas?.getContext("2d");
+    if (!drawing.current || !canvas || !ctx) return;
+    const r = canvas.getBoundingClientRect();
+    ctx.lineTo((e.clientX-r.left)*canvas.width/r.width, (e.clientY-r.top)*canvas.height/r.height); ctx.stroke();
+  }
+  function endDraw() {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const c = canvasRef.current; const ctx = c?.getContext("2d");
+    if (!c || !ctx) return;
+    if (!hasSignatureInk(ctx.getImageData(0, 0, c.width, c.height).data)) { setSignature(null); setError(t("signBlank")); return; }
+    setSignature({ data: c.toDataURL("image/png"), aspect: c.height / c.width });
+  }
+  async function exportPdf() {
+    if (!pdf || !signature || preview !== "ready" || importing) return;
+    setBusy(true); setError(null);
+    try {
+      const bytes = await createSignedPdf(pdf.bytes, signature, pageIndex, safe);
+      const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+      const name = pdf.name.replace(/\.pdf$/i, "") + "-signed.pdf";
+      const { isNative, savePdfNative, shareFileNative } = await import("@/lib/native");
+      if (isNative()) await shareFileNative(await savePdfNative(blob, name), name);
+      else downloadBlob(blob, name);
+      toast.success(t("signSuccess"));
+    } catch { setError(t("signExportError")); }
+    finally { setBusy(false); }
+  }
+  const disabled = busy || importing;
+  const pageSize = page ? displaySize(page) : { width: 1, height: 1 };
+  return <div className="min-h-screen"><AppHeader /><main className="mx-auto max-w-6xl px-4 pb-16">
+    <div className="mb-6 flex items-center gap-3 pt-6"><Button variant="ghost" size="icon" aria-label={t("back")} asChild><Link to="/"><ArrowLeft className="rtl:rotate-180" /></Link></Button><div><h1 className="text-2xl font-bold">{t("signTitle")}</h1><p className="text-sm text-muted-foreground">{t("signIntro")}</p></div></div>
+    {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
+    <section className="mb-6 grid gap-4 rounded-2xl border bg-card p-4 md:grid-cols-2"><div className="min-w-0"><h2 className="mb-2 font-semibold">{t("signPdf")}</h2>
+      <input ref={fileInput} aria-label={t("choosePdf")} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f=e.target.files?.[0]; e.target.value=""; void choosePdf(f); }} />
+      <Button className="h-auto max-w-full whitespace-normal break-all" disabled={disabled} onClick={() => fileInput.current?.click()}><Upload className="me-2 size-4 shrink-0" />{pdf?.name || t("choosePdf")}</Button><p className="mt-2 text-xs text-muted-foreground">{t("signOriginal")}</p></div>
+      <div><h2 className="mb-2 font-semibold">{t("signSource")}</h2><div className="flex flex-wrap gap-2"><Button disabled={disabled} variant={mode === "draw" ? "default" : "outline"} onClick={() => { setMode("draw"); setSignature(null); }}><FileSignature className="me-2 size-4" />{t("signDraw")}</Button>
+      <input ref={imageInput} aria-label={t("signImport")} type="file" accept="image/png,image/jpeg" hidden onChange={e => { const f=e.target.files?.[0]; e.target.value=""; void chooseImage(f); }} /><Button disabled={disabled} variant="outline" onClick={() => imageInput.current?.click()}><ImagePlus className="me-2 size-4" />{t("signImport")}</Button></div></div></section>
+    {importing && <p role="status" className="mb-4 text-sm">{t("loading")}</p>}
+    {mode === "draw" && <section className="mb-6 rounded-2xl border bg-card p-4"><div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">{t("signBox")}</h2><Button disabled={disabled} size="sm" variant="ghost" onClick={() => { const c=canvasRef.current; if(c) c.getContext("2d")?.clearRect(0,0,c.width,c.height); setSignature(null); setError(null); }}><Eraser className="me-2 size-4" />{t("clear")}</Button></div><canvas ref={canvasRef} aria-label={t("signBox")} width={900} height={220} className="h-44 w-full touch-none rounded-xl border bg-card" onPointerDown={disabled ? undefined : startDraw} onPointerMove={moveDraw} onPointerUp={endDraw} onPointerCancel={endDraw} /></section>}
+    {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{t("signPreview")}</span><img src={signature.data} alt={t("signPreview")} className="h-16 max-w-56 object-contain" /><Button disabled={disabled} variant="ghost" size="sm" onClick={() => setSignature(null)}>{t("remove")}</Button></section>}
+    {pdf && <section className="rounded-2xl border bg-card p-4"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">{t("signPlace")}</h2><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={disabled || pageIndex===0} onClick={() => { setPageIndex(p=>p-1); setPreview("loading"); }}>{t("previous")}</Button><span className="text-sm">{pageIndex+1} / {pdf.pages.length}</span><Button variant="outline" size="sm" disabled={disabled || pageIndex+1>=pdf.pages.length} onClick={() => { setPageIndex(p=>p+1); setPreview("loading"); }}>{t("next")}</Button></div></div>
+      {preview === "loading" && <p role="status" className="mb-3 text-sm">{t("signPreviewLoading")}</p>}{preview === "error" && <p role="alert" className="text-destructive">{t("signPreviewError")}</p>}
+      <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded border bg-muted" style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}>
+      <canvas ref={previewRef} aria-label={t("signPdf")} className={`block h-auto max-w-full ${preview !== "ready" ? "invisible" : ""}`} />
+      {signature && preview === "ready" && <img src={signature.data} alt={t("signPlace")} draggable={false} onPointerDown={e => { if(disabled) return; e.currentTarget.setPointerCapture(e.pointerId); drag.current={x:e.clientX,y:e.clientY,startX:safe.x,startY:safe.y}; }} onPointerMove={e => { const d=drag.current; const parent=e.currentTarget.parentElement; if(!d || !parent || !page || !e.currentTarget.hasPointerCapture(e.pointerId)) return; const r=parent.getBoundingClientRect(); setPlacement(clampPlacement({...safe,x:d.startX+(e.clientX-d.x)/r.width,y:d.startY+(e.clientY-d.y)/r.height},signature.aspect,page)); }} onPointerUp={() => {drag.current=null;}} onPointerCancel={() => {drag.current=null;}} onLostPointerCapture={() => {drag.current=null;}} className="absolute cursor-move touch-none border border-dashed border-muted-foreground" style={{left:`${safe.x*100}%`,top:`${safe.y*100}%`,width:`${safe.width*100}%`,height:"auto"}} />}</div>
+      <div className="mx-auto mt-4 flex max-w-xl items-center gap-3"><label htmlFor="signature-size" className="shrink-0 text-sm">{t("signSize")}</label><input id="signature-size" type="range" disabled={disabled || !signature} min="0.001" max="0.5" step="0.001" value={safe.width} onChange={e => { if(page && signature) setPlacement(clampPlacement({...safe,width:Number(e.target.value)},signature.aspect,page)); }} className="min-w-0 flex-1" /></div>
+      <div className="mt-5 flex justify-end"><Button onClick={() => void exportPdf()} disabled={!signature || disabled || preview !== "ready"}>{busy ? t("exporting") : <><Download className="me-2 size-4" />{t("signExport")}</>}</Button></div></section>}
+    <p className="mt-5 text-xs text-muted-foreground">{t("signDisclaimer")}</p>
+  </main></div>;
 }
