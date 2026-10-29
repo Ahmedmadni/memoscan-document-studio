@@ -14,3 +14,5 @@
 - UI strings live in src/lib/i18n.tsx (Arabic default, RTL); add both languages for every new string.
 - Keep dependencies browser-only for future Capacitor packaging; native needs are tracked in docs/ANDROID.md.
 - tsconfig has noUncheckedIndexedAccess off because the pixel loops index typed arrays heavily.
+- Signature geometry and PDF export share browser-safe helpers in src/lib/signature.ts using normalized visible crop-box coordinates, including page rotation, so preview and export agree.
+- PDF.js rendering lives in a dynamically imported browser-only module with a Vite-emitted matching worker and abort cleanup, so SSR does not evaluate browser rendering code.

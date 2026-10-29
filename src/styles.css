@@ -43,6 +43,7 @@
 }
 
 :root {
+  --signature-ink: #142b55;
   --radius: 0.875rem;
   --background: oklch(0.982 0.006 95);
   --foreground: oklch(0.22 0.025 220);

@@ -60,6 +60,8 @@ export const Route = createFileRoute("/doc/$id")({
         content: "Edit scanned pages, prepare PDFs and sign documents on your device.",
       },
       { property: "og:title", content: "Document — Waraqah" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content: "Private on-device document editing, scanning and PDF signing.",
