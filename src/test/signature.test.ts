@@ -108,7 +108,7 @@ describe("signature rules", () => {
             : "";
         })
         .join("");
-      expect(decoded).toContain("160 213.33333333333331 cm");
+      expect(decoded).toMatch(/1 0 0 1 160 213\.3333333333333\d cm/);
       expect(decoded).toContain("200 0 0 66.66666666666666 0 0 cm");
     },
   );
