@@ -22,6 +22,7 @@ function SignPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [signatureMode, setSignatureMode] = useState<"draw" | "image">("draw");
   const [placement, setPlacement] = useState({ x: 0.62, y: 0.72, width: 0.23 });
+  const [signatureAspect, setSignatureAspect] = useState(220 / 900);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -121,6 +122,12 @@ function SignPage() {
     setSignatureMode("image");
   }
 
+  function signatureHeightFraction(width: number) {
+    const canvas = previewRef.current;
+    const pageAspect = canvas && canvas.height > 0 ? canvas.width / canvas.height : 1;
+    return width * signatureAspect / pageAspect;
+  }
+
   async function exportSignedPdf() {
     if (!pdfBytes || !signature) return;
     setBusy(true);
@@ -190,7 +197,7 @@ function SignPage() {
           </section>
         )}
 
-        {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{ar ? "معاينة التوقيع" : "Signature preview"}</span><img src={signature} alt={ar ? "معاينة التوقيع" : "Signature preview"} className="h-16 max-w-56 object-contain" /><Button variant="ghost" size="sm" onClick={() => setSignature(null)}>{ar ? "إزالة" : "Remove"}</Button></section>}
+        {signature && <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4"><span className="text-sm font-medium">{ar ? "معاينة التوقيع" : "Signature preview"}</span><img src={signature} alt={ar ? "معاينة التوقيع" : "Signature preview"} onLoad={(e) => setSignatureAspect(e.currentTarget.naturalWidth > 0 ? e.currentTarget.naturalHeight / e.currentTarget.naturalWidth : 220 / 900)} className="h-16 max-w-56 object-contain" /><Button variant="ghost" size="sm" onClick={() => setSignature(null)}>{ar ? "إزالة" : "Remove"}</Button></section>}
 
         {pdfBytes && (
           <section className="rounded-2xl border bg-card p-4">
@@ -200,9 +207,16 @@ function SignPage() {
             </div>
             <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded border bg-muted">
               <canvas ref={previewRef} className="block h-auto max-w-full" />
-              {signature && <img src={signature} alt="" draggable={false} onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { x: e.clientX, y: e.clientY, startX: placement.x, startY: placement.y }; }} onPointerMove={(e) => { if (!dragRef.current || !e.currentTarget.hasPointerCapture(e.pointerId)) return; const parent = e.currentTarget.parentElement; if (!parent) return; const rect = parent.getBoundingClientRect(); setPlacement((p) => ({ ...p, x: Math.max(0, Math.min(0.85, dragRef.current!.startX + (e.clientX - dragRef.current!.x) / rect.width)), y: Math.max(0, Math.min(0.9, dragRef.current!.startY + (e.clientY - dragRef.current!.y) / rect.height)) })); }} onPointerUp={() => { dragRef.current = null; }} className="absolute cursor-move touch-none object-contain" style={{ left: `${placement.x * 100}%`, top: `${placement.y * 100}%`, width: `${placement.width * 100}%`, maxHeight: "20%", border: "1px dashed #64748b" }} />}
+              {signature && <img src={signature} alt="" draggable={false} onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { x: e.clientX, y: e.clientY, startX: placement.x, startY: placement.y }; }} onPointerMove={(e) => { if (!dragRef.current || !e.currentTarget.hasPointerCapture(e.pointerId)) return; const parent = e.currentTarget.parentElement; if (!parent) return; const rect = parent.getBoundingClientRect(); setPlacement((p) => {
+                  const nextX = dragRef.current!.startX + (e.clientX - dragRef.current!.x) / rect.width;
+                  const nextY = dragRef.current!.startY + (e.clientY - dragRef.current!.y) / rect.height;
+                  return { ...p, x: Math.max(0, Math.min(1 - p.width, nextX)), y: Math.max(0, Math.min(1 - signatureHeightFraction(p.width), nextY)) };
+                }); }} onPointerUp={() => { dragRef.current = null; }} className="absolute cursor-move touch-none object-contain" style={{ left: `${placement.x * 100}%`, top: `${placement.y * 100}%`, width: `${placement.width * 100}%`, height: "auto", border: "1px dashed #64748b" }} />}
             </div>
-            <div className="mx-auto mt-4 flex max-w-xl items-center gap-3"><label htmlFor="signature-size" className="text-sm">{ar ? "حجم التوقيع" : "Signature size"}</label><input id="signature-size" type="range" min="0.1" max="0.5" step="0.01" value={placement.width} onChange={(e) => setPlacement((p) => ({ ...p, width: Number(e.target.value) }))} className="flex-1" /></div>
+            <div className="mx-auto mt-4 flex max-w-xl items-center gap-3"><label htmlFor="signature-size" className="text-sm">{ar ? "حجم التوقيع" : "Signature size"}</label><input id="signature-size" type="range" min="0.1" max="0.5" step="0.01" value={placement.width} onChange={(e) => setPlacement((p) => {
+              const width = Number(e.target.value);
+              return { ...p, width, x: Math.min(p.x, 1 - width), y: Math.min(p.y, 1 - signatureHeightFraction(width)) };
+            })} className="flex-1" /></div>
             <div className="mt-5 flex justify-end"><Button onClick={() => void exportSignedPdf()} disabled={!signature || busy}>{busy ? (ar ? "جارٍ التصدير…" : "Exporting…") : <><Download className="me-2 size-4" />{ar ? "تصدير PDF الموقّع" : "Export signed PDF"}</>}</Button></div>
           </section>
         )}
