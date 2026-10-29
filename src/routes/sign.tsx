@@ -235,6 +235,9 @@ export function SignPage() {
                 onClick={() => {
                   setMode("draw");
                   setSignature(null);
+                  const canvas = canvasRef.current;
+                  if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+                  setError(null);
                 }}
               >
                 <FileSignature className="me-2 size-4" />
