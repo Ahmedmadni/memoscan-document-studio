@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SignRouteImport } from './routes/sign'
 import { Route as DocIdRouteImport } from './routes/doc.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignRoute = SignRouteImport.update({
+  id: '/sign',
+  path: '/sign',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocIdRoute = DocIdRouteImport.update({
   id: '/doc/$id',
   path: '/doc/$id',
@@ -32,30 +38,34 @@ const DocIdRoute = DocIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
+  '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/privacy' | '/doc/$id'
+  fullPaths: '/' | '/privacy' | '/sign' | '/doc/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/privacy' | '/doc/$id'
-  id: '__root__' | '/' | '/privacy' | '/doc/$id'
+  to: '/' | '/privacy' | '/sign' | '/doc/$id'
+  id: '__root__' | '/' | '/privacy' | '/sign' | '/doc/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PrivacyRoute: typeof PrivacyRoute
+  SignRoute: typeof SignRoute
   DocIdRoute: typeof DocIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign': {
+      id: '/sign'
+      path: '/sign'
+      fullPath: '/sign'
+      preLoaderRoute: typeof SignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/doc/$id': {
       id: '/doc/$id'
       path: '/doc/$id'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PrivacyRoute: PrivacyRoute,
+  SignRoute: SignRoute,
   DocIdRoute: DocIdRoute,
 }
 export const routeTree = rootRouteImport
