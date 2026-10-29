@@ -6,13 +6,15 @@ import { useI18n } from "@/lib/i18n";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy — MemoScan" },
+      { title: "Privacy — Waraqah" },
       {
         name: "description",
         content:
-          "MemoScan processes and stores your scans only on your device. Nothing is uploaded.",
+          "Waraqah processes and stores your scans only on your device. Nothing is uploaded.",
       },
-      { property: "og:title", content: "Privacy — MemoScan" },
+      { property: "og:title", content: "Privacy — Waraqah" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content: "On-device processing, local storage, no uploads, no accounts.",

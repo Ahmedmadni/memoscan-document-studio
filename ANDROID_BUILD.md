@@ -2,7 +2,7 @@
 
 ## Current status
 
-MemoScan uses TanStack Start (SSR) and Capacitor 8 dependencies are present. Capacitor is configured with `webDir: "dist/client"`. **Do not assume this directory is a standalone SPA**: the Android build requires `dist/client/index.html` to exist and the app's client-side routes to work when served locally. The GitHub Actions workflow checks this before creating/building the Android project. If that check fails, the remaining blocker is configuring a supported TanStack Start SPA/static output mode; do not bypass the check or point Capacitor at server-only output.
+Waraqah uses TanStack Start with SPA shell prerendering and Capacitor 8. Capacitor is configured with `webDir: ".output/public"`. The Android build requires `.output/public/index.html` and client-side routes working locally. The GitHub Actions workflow checks this before creating/building Android. If it fails, fix SPA/static output rather than bypassing the check or packaging server-only output.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ bun run build
 Verify the expected web entry point before running Capacitor:
 
 ```sh
-test -f dist/client/index.html || (echo "Missing dist/client/index.html: configure a supported static/SPA build before packaging" && exit 1)
+test -f .output/public/index.html || (echo "Missing .output/public/index.html: configure a supported static/SPA build before packaging" && exit 1)
 ```
 
 Only after the check passes:

@@ -27,6 +27,8 @@ export const Route = createFileRoute("/")({
           "Scan, straighten and enhance documents into multi-page PDFs — fully on your device.",
       },
       { property: "og:title", content: "Waraqah — ورقة" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content: "Private document workspace for scanning pages and signing PDFs on-device.",
@@ -43,6 +45,7 @@ function Home() {
   const navigate = useNavigate();
   const [docs, setDocs] = useState<DocWithThumb[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -106,7 +109,11 @@ function Home() {
           <h1 className="max-w-xl text-3xl font-bold leading-tight sm:text-4xl">{t("appName")}</h1>
           <p className="mt-2 max-w-xl text-muted-foreground">{t("tagline")}</p>
           <div className="mt-6">
-            <ImagePickers onFiles={startWith} disabled={!!busy} />
+            <div className="flex flex-wrap gap-3">
+              <Button disabled={!!busy} onClick={() => setScanOpen((open) => !open)} aria-expanded={scanOpen}><FileText />{t("scanDocuments")}</Button>
+              <Button variant="outline" asChild><Link to="/sign"><FileSignature />{t("addSignature")}</Link></Button>
+            </div>
+            {scanOpen && <div className="mt-4"><ImagePickers onFiles={startWith} disabled={!!busy} /></div>}
           </div>
           {busy && (
             <p className="mt-4 flex items-center gap-2 text-sm text-primary" role="status">
