@@ -110,10 +110,26 @@ function Home() {
           <p className="mt-2 max-w-xl text-muted-foreground">{t("tagline")}</p>
           <div className="mt-6">
             <div className="flex flex-wrap gap-3">
-              <Button disabled={!!busy} onClick={() => setScanOpen((open) => !open)} aria-expanded={scanOpen}><FileText />{t("scanDocuments")}</Button>
-              <Button variant="outline" asChild><Link to="/sign"><FileSignature />{t("addSignature")}</Link></Button>
+              <Button
+                disabled={!!busy}
+                onClick={() => setScanOpen((open) => !open)}
+                aria-expanded={scanOpen}
+              >
+                <FileText />
+                {t("scanDocuments")}
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/sign">
+                  <FileSignature />
+                  {t("addSignature")}
+                </Link>
+              </Button>
             </div>
-            {scanOpen && <div className="mt-4"><ImagePickers onFiles={startWith} disabled={!!busy} /></div>}
+            {scanOpen && (
+              <div className="mt-4">
+                <ImagePickers onFiles={startWith} disabled={!!busy} />
+              </div>
+            )}
           </div>
           {busy && (
             <p className="mt-4 flex items-center gap-2 text-sm text-primary" role="status">
