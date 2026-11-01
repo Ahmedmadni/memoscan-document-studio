@@ -64,11 +64,11 @@ function Home() {
           />
           <div className="workspace-copy relative flex h-full max-w-xl flex-col justify-center px-6 py-8 md:px-10">
             <p className="mb-4 text-xs font-semibold text-primary">{t("workspaceLabel")}</p>
-            <h1 className="text-5xl font-semibold leading-tight md:text-6xl">
+            <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
               {t("appName")}
               <span className="ms-3 inline-block size-2 rounded-full bg-accent" />
             </h1>
-            <p className="mt-4 text-xl font-medium text-foreground">{t("homeSubtitle")}</p>
+            <p className="mt-3 text-base font-medium text-foreground md:text-lg">{t("homeSubtitle")}</p>
             <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="size-4 text-primary" />
               {t("privacyShort")}
