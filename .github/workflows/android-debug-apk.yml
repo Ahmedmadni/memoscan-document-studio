@@ -52,7 +52,7 @@ jobs:
           src/components/BottomNav.tsx
           src/components/ImagePickers.tsx
           src/components/PageHeading.tsx
-          src/routes/doc.$id.tsx
+          'src/routes/doc.$id.tsx'
           src/routes/documents.tsx
           src/routes/index.tsx
           src/routes/privacy.tsx
