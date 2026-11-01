@@ -62,18 +62,21 @@ export async function loadImageCanvas(blob: Blob, maxDim = 2400): Promise<HTMLCa
   let draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
 
   if (typeof createImageBitmap === "function") {
+    let bmp: ImageBitmap | null = null;
     try {
-      const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+      bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
       width = bmp.width;
       height = bmp.height;
-      draw = (ctx, canvas) => ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      if (!width || !height) throw new Error("UNSUPPORTED_IMAGE");
       const scale = Math.min(1, maxDim / Math.max(width, height));
       const canvas = makeCanvas(width * scale, height * scale);
-      draw(ctx2d(canvas), canvas);
-      bmp.close();
+      ctx2d(canvas).drawImage(bmp, 0, 0, canvas.width, canvas.height);
       return canvas;
     } catch {
       // Fall through to the WebView-compatible Image decoder below.
+    } finally {
+      // ImageBitmap owns native image memory; release it even if canvas drawing fails.
+      bmp?.close();
     }
   }
 
