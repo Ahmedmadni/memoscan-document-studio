@@ -44,6 +44,7 @@ export function SignPage() {
     null,
   );
   const [pageIndex, setPageIndex] = useState(0);
+  const [applyToAllPages, setApplyToAllPages] = useState(false);
   const [signature, setSignature] = useState<SignatureImage | null>(null);
   const [mode, setMode] = useState<"draw" | "image">("draw");
   const [placement, setPlacement] = useState(INITIAL_PLACEMENT);
@@ -166,7 +167,7 @@ export function SignPage() {
     setBusy(true);
     setError(null);
     try {
-      const bytes = await createSignedPdf(pdf.bytes, signature, pageIndex, safe);
+      const bytes = await createSignedPdf(pdf.bytes, signature, pageIndex, safe, applyToAllPages);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const name = pdf.name.replace(/\.pdf$/i, "") + "-signed.pdf";
       const { isNative, savePdfNative, shareFileNative } = await import("@/lib/native");
@@ -353,6 +354,17 @@ export function SignPage() {
                 </Button>
               </div>
             </div>
+            <fieldset className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+              <legend className="mb-2 font-medium">{t("signScope")}</legend>
+              <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2">
+                <input type="radio" name="signature-scope" checked={!applyToAllPages} onChange={() => setApplyToAllPages(false)} />
+                {t("signCurrentPage")}
+              </label>
+              <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2">
+                <input type="radio" name="signature-scope" checked={applyToAllPages} onChange={() => setApplyToAllPages(true)} />
+                {t("signAllPages")}
+              </label>
+            </fieldset>
             {preview === "loading" && (
               <p role="status" className="mb-3 text-sm">
                 {t("signPreviewLoading")}
