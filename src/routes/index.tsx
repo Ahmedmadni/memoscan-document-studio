@@ -28,7 +28,7 @@ export const Route = createFileRoute("/")({
 });
 function Home() {
   const { t, lang } = useI18n();
-  const [recent, setRecent] = useState<(DocRecord & { thumb?: string })[]>([]);
+  const [recent, setRecent] = useState<(DocRecord & { thumb?: string | undefined })[]>([]);
   useEffect(() => {
     let active = true;
     void listDocs()
