@@ -27,6 +27,7 @@ export function ImagePickers({
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewCorners, setReviewCorners] = useState<Corners>(FULL_CORNERS);
   const [activeCorner, setActiveCorner] = useState<number | null>(null);
+  const [reviewImageSize, setReviewImageSize] = useState({ width: 0, height: 0 });
   const reviewUrl = useMemo(() => reviewFile ? URL.createObjectURL(reviewFile) : null, [reviewFile]);
   useEffect(() => () => { if (reviewUrl) URL.revokeObjectURL(reviewUrl); }, [reviewUrl]);
   const previews = useMemo(
@@ -142,6 +143,7 @@ export function ImagePickers({
           lastModified: Date.now(),
         });
         setReviewFile(file);
+        setReviewImageSize({ width: canvas.width, height: canvas.height });
         setReviewCorners(liveCorners ?? FULL_CORNERS);
       },
       "image/jpeg",
@@ -159,6 +161,7 @@ export function ImagePickers({
       );
       const file = new File([blob], reviewFile.name, { type: "image/jpeg", lastModified: Date.now() });
       setReviewFile(null);
+      setReviewImageSize({ width: 0, height: 0 });
       setActiveCorner(null);
       if (captureMode === "single") {
         setCameraOpen(false);
@@ -224,20 +227,29 @@ export function ImagePickers({
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black camera-landscape-stage">
             {reviewFile && reviewUrl ? (
               <div className="relative flex h-full w-full items-center justify-center p-4">
-                <img src={reviewUrl} alt={t("page")} className="max-h-full max-w-full object-contain" draggable={false} />
-                <svg className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none" viewBox="0 0 1 1" preserveAspectRatio="none"
+                <img src={reviewUrl} alt={t("page")} className="max-h-full max-w-full object-contain" draggable={false}
+                  onLoad={(e) => setReviewImageSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} />
+                {reviewImageSize.width > 0 && reviewImageSize.height > 0 && <svg
+                  className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none"
+                  viewBox={`0 0 ${reviewImageSize.width} ${reviewImageSize.height}`}
+                  preserveAspectRatio="xMidYMid meet"
                   onPointerMove={(e) => {
                     if (activeCorner === null) return;
                     const r = e.currentTarget.getBoundingClientRect();
-                    const x = Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
-                    const y = Math.max(0, Math.min(1, (e.clientY-r.top)/r.height));
+                    const scale = Math.min(r.width / reviewImageSize.width, r.height / reviewImageSize.height);
+                    const renderedWidth = reviewImageSize.width * scale;
+                    const renderedHeight = reviewImageSize.height * scale;
+                    const offsetX = (r.width - renderedWidth) / 2;
+                    const offsetY = (r.height - renderedHeight) / 2;
+                    const x = Math.max(0, Math.min(1, (e.clientX - r.left - offsetX) / renderedWidth));
+                    const y = Math.max(0, Math.min(1, (e.clientY - r.top - offsetY) / renderedHeight));
                     setReviewCorners((old) => old.map((p,i) => i === activeCorner ? {x,y} : p) as Corners);
                   }}
                   onPointerUp={() => setActiveCorner(null)}
                   onPointerCancel={() => setActiveCorner(null)}>
-                  <polygon points={reviewCorners.map(p => `${p.x},${p.y}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth=".006" vectorEffect="non-scaling-stroke" />
-                  {reviewCorners.map((p,i) => <circle key={i} cx={p.x} cy={p.y} r=".025" fill="#39e6ad" stroke="white" strokeWidth=".004" onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
-                </svg>
+                  <polygon points={reviewCorners.map(p => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .004)} vectorEffect="non-scaling-stroke" />
+                  {reviewCorners.map((p,i) => <circle key={i} cx={p.x * reviewImageSize.width} cy={p.y * reviewImageSize.height} r={Math.max(12, Math.min(reviewImageSize.width, reviewImageSize.height) * .025)} fill="#39e6ad" stroke="white" strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .003)} onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
+                </svg>}
               </div>
             ) : <><video
               ref={video}
@@ -289,7 +301,7 @@ export function ImagePickers({
 
           {reviewFile ? (
             <footer className="flex items-center justify-center gap-3 border-t border-white/15 p-4">
-              <Button variant="outline" onClick={() => setReviewFile(null)}>{t("cancel")}</Button>
+              <Button variant="outline" onClick={() => { setReviewFile(null); setReviewImageSize({ width: 0, height: 0 }); setActiveCorner(null); }}>{t("cancel")}</Button>
               <Button onClick={() => void acceptReview()}><Check /> {t("useCaptured")}</Button>
             </footer>
           ) : null}
