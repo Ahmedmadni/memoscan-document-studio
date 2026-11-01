@@ -1,5 +1,5 @@
-import { Camera, Check, ImagePlus, Minus, X, ScanLine } from "lucide-react";
-import { detectDocument, loadImageCanvas, type Corners } from "@/lib/imaging";
+import { Camera, Check, ImagePlus, Minus, X } from "lucide-react";
+import { detectDocument, type Corners } from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -33,7 +33,6 @@ export function ImagePickers({
 
   useEffect(() => {
     if (!cameraOpen) {
-      if (detectTimer) clearInterval(detectTimer);
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
       setCameraReady(false);
@@ -44,7 +43,6 @@ export function ImagePickers({
     }
     let active = true;
     let detectTimer: ReturnType<typeof setInterval> | undefined;
-    let previousOrientation: string | undefined;
     const startCamera = async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("CAMERA_UNAVAILABLE");
@@ -63,7 +61,6 @@ export function ImagePickers({
         stream.current = media;
         try {
           const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
-          previousOrientation = orientation.type;
           await orientation.lock("landscape");
         } catch { /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */ }
         try {
