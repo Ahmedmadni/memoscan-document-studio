@@ -43,7 +43,6 @@ export function ImagePickers({
       setCameraReady(false);
       setLiveCorners(null);
       try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
-      void import("@capacitor/status-bar").then(({ StatusBar }) => StatusBar.show()).catch(() => undefined);
       return;
     }
     let active = true;
@@ -68,10 +67,6 @@ export function ImagePickers({
           const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
           await orientation.lock("landscape");
         } catch { /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */ }
-        try {
-          const { StatusBar } = await import("@capacitor/status-bar");
-          await StatusBar.hide();
-        } catch { /* Browser preview has no native status bar. */ }
         if (video.current) {
           video.current.srcObject = media;
           await video.current.play();
@@ -105,7 +100,6 @@ export function ImagePickers({
       setCameraReady(false);
       setLiveCorners(null);
       try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
-      void import("@capacitor/status-bar").then(({ StatusBar }) => StatusBar.show()).catch(() => undefined);
     };
   }, [cameraOpen, t]);
 
