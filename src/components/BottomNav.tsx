@@ -9,7 +9,7 @@ export function BottomNav() {
     { to: "/", label: t("navHome"), icon: Home, active: pathname === "/" || pathname.startsWith("/doc/") },
     { to: "/", label: t("navScan"), icon: ScanLine, active: false },
     { to: "/sign", label: t("navSign"), icon: FileSignature, active: pathname === "/sign" },
-    { to: "/privacy", label: t("navSettings"), icon: Settings, active: pathname === "/privacy" },
+    { to: "/settings", label: t("navSettings"), icon: Settings, active: pathname === "/settings" },
   ] as const;
   return (
     <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
