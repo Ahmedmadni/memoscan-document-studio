@@ -178,6 +178,10 @@ const dict = {
     ar: "تعذر قراءة الصورة. جرّب JPG أو PNG.",
     en: "Couldn't read this image. Try JPG or PNG.",
   },
+  errHeic: {
+    ar: "صيغة HEIC/HEIF غير مدعومة على هذا الجهاز. حوّل الصورة إلى JPG أو PNG ثم أعد استيرادها.",
+    en: "HEIC/HEIF isn’t supported on this device. Convert the image to JPG or PNG and import it again.",
+  },
   errGeneric: { ar: "حدث خطأ غير متوقع.", en: "Something went wrong." },
   errStorage: {
     ar: "التخزين المحلي غير متاح في هذا المتصفح.",
