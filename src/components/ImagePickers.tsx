@@ -1,5 +1,5 @@
 import { Camera, Check, ImagePlus, Minus, X } from "lucide-react";
-import { detectDocument, type Corners } from "@/lib/imaging";
+import { detectDocument, FULL_CORNERS, loadImageCanvas, warpPerspective, type Corners } from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -24,6 +24,11 @@ export function ImagePickers({
   const [captured, setCaptured] = useState<File[]>([]);
   const [captureMode, setCaptureMode] = useState<"single" | "multi">("multi");
   const [liveCorners, setLiveCorners] = useState<Corners | null>(null);
+  const [reviewFile, setReviewFile] = useState<File | null>(null);
+  const [reviewCorners, setReviewCorners] = useState<Corners>(FULL_CORNERS);
+  const [activeCorner, setActiveCorner] = useState<number | null>(null);
+  const reviewUrl = useMemo(() => reviewFile ? URL.createObjectURL(reviewFile) : null, [reviewFile]);
+  useEffect(() => () => { if (reviewUrl) URL.revokeObjectURL(reviewUrl); }, [reviewUrl]);
   const previews = useMemo(
     () => captured.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [captured],
@@ -114,6 +119,8 @@ export function ImagePickers({
     setCameraOpen(false);
     setCaptured([]);
     setCameraError("");
+    setReviewFile(null);
+    setActiveCorner(null);
   };
 
   const capture = () => {
@@ -135,16 +142,34 @@ export function ImagePickers({
           type: "image/jpeg",
           lastModified: Date.now(),
         });
-        if (captureMode === "single") {
-          setCameraOpen(false);
-          onFiles([file]);
-        } else {
-          setCaptured((current) => [...current, file]);
-        }
+        setReviewFile(file);
+        setReviewCorners(liveCorners ?? FULL_CORNERS);
       },
       "image/jpeg",
       0.94,
     );
+  };
+
+  const acceptReview = async () => {
+    if (!reviewFile) return;
+    try {
+      const source = await loadImageCanvas(reviewFile, 3000);
+      const cropped = warpPerspective(source, reviewCorners, 3000);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        cropped.toBlob((value) => value ? resolve(value) : reject(new Error("CROP_FAILED")), "image/jpeg", 0.95),
+      );
+      const file = new File([blob], reviewFile.name, { type: "image/jpeg", lastModified: Date.now() });
+      setReviewFile(null);
+      setActiveCorner(null);
+      if (captureMode === "single") {
+        setCameraOpen(false);
+        onFiles([file]);
+      } else {
+        setCaptured((current) => [...current, file]);
+      }
+    } catch {
+      setCameraError(t("captureFailed"));
+    }
   };
 
   const acceptCaptured = () => {
@@ -198,7 +223,24 @@ export function ImagePickers({
           </header>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black camera-landscape-stage">
-            <video
+            {reviewFile && reviewUrl ? (
+              <div className="relative flex h-full w-full items-center justify-center p-4">
+                <img src={reviewUrl} alt={t("page")} className="max-h-full max-w-full object-contain" draggable={false} />
+                <svg className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none" viewBox="0 0 1 1" preserveAspectRatio="none"
+                  onPointerMove={(e) => {
+                    if (activeCorner === null) return;
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
+                    const y = Math.max(0, Math.min(1, (e.clientY-r.top)/r.height));
+                    setReviewCorners((old) => old.map((p,i) => i === activeCorner ? {x,y} : p) as Corners);
+                  }}
+                  onPointerUp={() => setActiveCorner(null)}
+                  onPointerCancel={() => setActiveCorner(null)}>
+                  <polygon points={reviewCorners.map(p => `${p.x},${p.y}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth=".006" vectorEffect="non-scaling-stroke" />
+                  {reviewCorners.map((p,i) => <circle key={i} cx={p.x} cy={p.y} r=".025" fill="#39e6ad" stroke="white" strokeWidth=".004" onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
+                </svg>
+              </div>
+            ) : <><video
               ref={video}
               autoPlay
               muted
@@ -224,7 +266,15 @@ export function ImagePickers({
                 {t("cameraStarting")}
               </p>
             )}
+            </>}
           </div>
+
+          {reviewFile ? (
+            <footer className="flex items-center justify-center gap-3 border-t border-white/15 p-4">
+              <Button variant="outline" onClick={() => setReviewFile(null)}>{t("cancel")}</Button>
+              <Button onClick={() => void acceptReview()}><Check /> {t("useCaptured")}</Button>
+            </footer>
+          ) : null}
 
           {previews.length > 0 && (
             <div className="flex gap-2 overflow-x-auto border-t border-white/15 px-3 py-2">
@@ -266,11 +316,11 @@ export function ImagePickers({
             <Button
               className="rounded-full"
               onClick={capture}
-              disabled={!!cameraError || !cameraReady}
+              disabled={!!cameraError || !cameraReady || !!reviewFile}
             >
               <Camera /> {t("capturePage")}
             </Button>
-            <Button onClick={acceptCaptured} disabled={!captured.length || captureMode === "single"}>
+            <Button onClick={acceptCaptured} disabled={!captured.length || captureMode === "single" || !!reviewFile}>
               <Check /> {t("useCaptured")} ({captured.length})
             </Button>
           </footer>
