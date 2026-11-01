@@ -57,6 +57,9 @@ function ctx2d(c: HTMLCanvasElement) {
  * an HTMLImageElement fallback instead of rejecting otherwise valid gallery photos.
  */
 export async function loadImageCanvas(blob: Blob, maxDim = 2400): Promise<HTMLCanvasElement> {
+  if (!Number.isFinite(maxDim) || maxDim <= 0) throw new Error("INVALID_IMAGE_SIZE");
+  const fileName = "name" in blob && typeof blob.name === "string" ? blob.name : "";
+  const isHeic = /image\/(heic|heif)/i.test(blob.type) || /\.(heic|heif)$/i.test(fileName);
   let width = 0;
   let height = 0;
   let draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
@@ -87,6 +90,8 @@ export async function loadImageCanvas(blob: Blob, maxDim = 2400): Promise<HTMLCa
       element.onload = () => resolve(element);
       element.onerror = () => reject(new Error("UNSUPPORTED_IMAGE"));
       element.src = objectUrl;
+    }).catch(() => {
+      throw new Error(isHeic ? "UNSUPPORTED_HEIC" : "UNSUPPORTED_IMAGE");
     });
     width = image.naturalWidth;
     height = image.naturalHeight;
