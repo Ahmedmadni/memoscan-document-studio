@@ -1,4 +1,5 @@
-import { Camera, Check, ImagePlus, Minus, X } from "lucide-react";
+import { Camera, Check, ImagePlus, Minus, X, ScanLine } from "lucide-react";
+import { detectDocument, loadImageCanvas, type Corners } from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -21,6 +22,8 @@ export function ImagePickers({
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [captured, setCaptured] = useState<File[]>([]);
+  const [captureMode, setCaptureMode] = useState<"single" | "multi">("multi");
+  const [liveCorners, setLiveCorners] = useState<Corners | null>(null);
   const previews = useMemo(
     () => captured.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [captured],
@@ -30,12 +33,18 @@ export function ImagePickers({
 
   useEffect(() => {
     if (!cameraOpen) {
+      if (detectTimer) clearInterval(detectTimer);
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
       setCameraReady(false);
+      setLiveCorners(null);
+      try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
+      void import("@capacitor/status-bar").then(({ StatusBar }) => StatusBar.show()).catch(() => undefined);
       return;
     }
     let active = true;
+    let detectTimer: ReturnType<typeof setInterval> | undefined;
+    let previousOrientation: string | undefined;
     const startCamera = async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("CAMERA_UNAVAILABLE");
@@ -52,10 +61,33 @@ export function ImagePickers({
           return;
         }
         stream.current = media;
+        try {
+          const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
+          previousOrientation = orientation.type;
+          await orientation.lock("landscape");
+        } catch { /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */ }
+        try {
+          const { StatusBar } = await import("@capacitor/status-bar");
+          await StatusBar.hide();
+        } catch { /* Browser preview has no native status bar. */ }
         if (video.current) {
           video.current.srcObject = media;
           await video.current.play();
           setCameraReady(true);
+          detectTimer = setInterval(async () => {
+            const source = video.current;
+            if (!source || source.readyState < 2 || !source.videoWidth) return;
+            try {
+              const sample = document.createElement("canvas");
+              sample.width = 320;
+              sample.height = Math.round(320 * source.videoHeight / source.videoWidth);
+              const context = sample.getContext("2d");
+              if (!context) return;
+              context.drawImage(source, 0, 0, sample.width, sample.height);
+              const result = detectDocument(sample);
+              setLiveCorners(result.detected ? result.corners : null);
+            } catch { setLiveCorners(null); }
+          }, 550);
         }
       } catch {
         if (active) setCameraError(t("cameraUnavailable"));
@@ -65,9 +97,13 @@ export function ImagePickers({
     void startCamera();
     return () => {
       active = false;
+      if (detectTimer) clearInterval(detectTimer);
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
       setCameraReady(false);
+      setLiveCorners(null);
+      try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
+      void import("@capacitor/status-bar").then(({ StatusBar }) => StatusBar.show()).catch(() => undefined);
     };
   }, [cameraOpen, t]);
 
@@ -102,7 +138,12 @@ export function ImagePickers({
           type: "image/jpeg",
           lastModified: Date.now(),
         });
-        setCaptured((current) => [...current, file]);
+        if (captureMode === "single") {
+          setCameraOpen(false);
+          onFiles([file]);
+        } else {
+          setCaptured((current) => [...current, file]);
+        }
       },
       "image/jpeg",
       0.94,
@@ -141,7 +182,7 @@ export function ImagePickers({
           aria-modal="true"
           aria-label={t("scanCamera")}
         >
-          <header className="flex items-center justify-between gap-3 border-b border-white/15 px-4 py-3">
+          <header className="flex items-center justify-between gap-3 border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div>
               <p className="font-semibold">{t("scanCamera")}</p>
               <p className="text-sm text-white/70">
@@ -159,7 +200,7 @@ export function ImagePickers({
             </Button>
           </header>
 
-          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black camera-landscape-stage">
             <video
               ref={video}
               autoPlay
@@ -167,6 +208,12 @@ export function ImagePickers({
               playsInline
               className="h-full w-full object-contain"
             />
+            {liveCorners && (
+              <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label={t("livePageEdges")}>
+                <polygon points={liveCorners.map((p) => `${p.x},${p.y}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth="0.006" vectorEffect="non-scaling-stroke" />
+                {liveCorners.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="0.012" fill="#39e6ad" />)}
+              </svg>
+            )}
             {cameraError && (
               <div
                 className="absolute inset-x-5 top-5 rounded-xl bg-red-950/90 p-4 text-sm"
@@ -207,7 +254,11 @@ export function ImagePickers({
             </div>
           )}
 
-          <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-white/15 px-4 py-4">
+          <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-white/15 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex rounded-full border border-white/25 p-1" role="group" aria-label={t("captureMode")}>
+              <button type="button" onClick={() => setCaptureMode("single")} aria-pressed={captureMode === "single"} className={`rounded-full px-3 py-1.5 text-sm ${captureMode === "single" ? "bg-white text-black" : "text-white"}`}>{t("singleShot")}</button>
+              <button type="button" onClick={() => setCaptureMode("multi")} aria-pressed={captureMode === "multi"} className={`rounded-full px-3 py-1.5 text-sm ${captureMode === "multi" ? "bg-white text-black" : "text-white"}`}>{t("multiShot")}</button>
+            </div>
             <Button
               variant="outline"
               className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
@@ -222,7 +273,7 @@ export function ImagePickers({
             >
               <Camera /> {t("capturePage")}
             </Button>
-            <Button onClick={acceptCaptured} disabled={!captured.length}>
+            <Button onClick={acceptCaptured} disabled={!captured.length || captureMode === "single"}>
               <Check /> {t("useCaptured")} ({captured.length})
             </Button>
           </footer>
