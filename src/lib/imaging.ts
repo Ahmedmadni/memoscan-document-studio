@@ -52,19 +52,49 @@ function ctx2d(c: HTMLCanvasElement) {
   return ctx;
 }
 
-/** Decode an image blob (EXIF orientation applied) into a canvas capped at maxDim. */
+/** Decode an image blob into a bounded canvas.
+ * Android System WebView versions differ in createImageBitmap support, so use
+ * an HTMLImageElement fallback instead of rejecting otherwise valid gallery photos.
+ */
 export async function loadImageCanvas(blob: Blob, maxDim = 2400): Promise<HTMLCanvasElement> {
-  let bmp: ImageBitmap;
-  try {
-    bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
-  } catch {
-    throw new Error("UNSUPPORTED_IMAGE");
+  let width = 0;
+  let height = 0;
+  let draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
+
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+      width = bmp.width;
+      height = bmp.height;
+      draw = (ctx, canvas) => ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      const canvas = makeCanvas(width * scale, height * scale);
+      draw(ctx2d(canvas), canvas);
+      bmp.close();
+      return canvas;
+    } catch {
+      // Fall through to the WebView-compatible Image decoder below.
+    }
   }
-  const s = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
-  const c = makeCanvas(bmp.width * s, bmp.height * s);
-  ctx2d(c).drawImage(bmp, 0, 0, c.width, c.height);
-  bmp.close();
-  return c;
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("UNSUPPORTED_IMAGE"));
+      element.src = objectUrl;
+    });
+    width = image.naturalWidth;
+    height = image.naturalHeight;
+    if (!width || !height) throw new Error("UNSUPPORTED_IMAGE");
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    const canvas = makeCanvas(width * scale, height * scale);
+    ctx2d(canvas).drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 export function scaleCanvas(src: HTMLCanvasElement, maxDim: number): HTMLCanvasElement {
@@ -462,23 +492,40 @@ export function detectDocument(src: HTMLCanvasElement): DetectResult {
 }
 
 function boxBlur(g: Uint8Array, w: number, h: number, r: number) {
-  const b = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++)
+  // Two sliding-window passes keep live camera detection inexpensive on mobile.
+  const horizontal = new Uint8Array(w * h);
+  const output = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    let sum = 0;
+    for (let x = 0; x <= Math.min(w - 1, r); x++) sum += g[y * w + x];
     for (let x = 0; x < w; x++) {
-      let s = 0;
-      let n = 0;
-      for (let dy = -r; dy <= r; dy++)
-        for (let dx = -r; dx <= r; dx++) {
-          const yy = y + dy;
-          const xx = x + dx;
-          if (yy >= 0 && yy < h && xx >= 0 && xx < w) {
-            s += g[yy * w + xx];
-            n++;
-          }
-        }
-      b[y * w + x] = s / n;
+      const left = Math.max(0, x - r);
+      const right = Math.min(w - 1, x + r);
+      if (x > 0) {
+        const removeX = x - r - 1;
+        const addX = x + r;
+        if (removeX >= 0) sum -= g[y * w + removeX];
+        if (addX < w) sum += g[y * w + addX];
+      }
+      horizontal[y * w + x] = sum / (right - left + 1);
     }
-  return b;
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = 0; y <= Math.min(h - 1, r); y++) sum += horizontal[y * w + x];
+    for (let y = 0; y < h; y++) {
+      const top = Math.max(0, y - r);
+      const bottom = Math.min(h - 1, y + r);
+      if (y > 0) {
+        const removeY = y - r - 1;
+        const addY = y + r;
+        if (removeY >= 0) sum -= horizontal[removeY * w + x];
+        if (addY < h) sum += horizontal[addY * w + x];
+      }
+      output[y * w + x] = sum / (bottom - top + 1);
+    }
+  }
+  return output;
 }
 
 /**
