@@ -98,7 +98,7 @@ describe("signature rules", () => {
       const contents = page.node.Contents();
       expect(contents).toBeDefined();
       const resources = page.node.Resources();
-      expect(resources?.lookup(PDFName.of("XObject")).toString()).toContain("Image");
+      expect(resources?.lookup(PDFName.of("XObject"))?.toString()).toContain("Image");
       const refs = contents && "asArray" in contents ? contents.asArray() : [contents];
       const decoded = refs
         .map((ref) => {

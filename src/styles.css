@@ -13,6 +13,8 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
+  --color-signature: var(--signature);
+  --color-signature-soft: var(--signature-soft);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -43,9 +45,12 @@
 }
 
 :root {
+  --signature: oklch(0.52 0.13 30);
+  --signature-soft: oklch(0.96 0.025 30);
+  --cover-wash: oklch(0.96 0.006 210);
   --signature-ink: #142b55;
-  --radius: 0.875rem;
-  --background: oklch(0.982 0.006 95);
+  --radius: 0.5rem;
+  --background: oklch(0.985 0.003 210);
   --foreground: oklch(0.22 0.025 220);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.22 0.025 220);
@@ -55,10 +60,10 @@
   --primary-foreground: oklch(0.99 0.005 95);
   --secondary: oklch(0.945 0.018 195);
   --secondary-foreground: oklch(0.3 0.06 205);
-  --muted: oklch(0.95 0.008 95);
+  --muted: oklch(0.953 0.006 210);
   --muted-foreground: oklch(0.47 0.02 220);
-  --accent: oklch(0.8 0.14 75);
-  --accent-foreground: oklch(0.25 0.04 60);
+  --accent: oklch(0.76 0.13 35);
+  --accent-foreground: oklch(0.26 0.06 35);
   --destructive: oklch(0.55 0.2 27);
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.55 0.12 155);
@@ -66,8 +71,8 @@
   --stage: oklch(0.24 0.02 220);
   --stage-foreground: oklch(0.96 0.005 95);
   --handle: oklch(0.8 0.15 75);
-  --border: oklch(0.9 0.01 95);
-  --input: oklch(0.88 0.012 95);
+  --border: oklch(0.9 0.007 210);
+  --input: oklch(0.88 0.009 210);
   --ring: oklch(0.55 0.09 200);
   --shadow-paper-v: 0 1px 2px oklch(0.3 0.02 220 / 8%), 0 8px 24px -12px oklch(0.3 0.02 220 / 22%);
   --shadow-lift-v: 0 18px 40px -18px oklch(0.35 0.08 200 / 45%);
@@ -84,16 +89,24 @@
     -webkit-tap-highlight-color: transparent;
     padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     font-family: var(--font-sans);
   }
   html {
-    font-size: clamp(14px, 0.35vw + 12px, 17px);
+    font-size: 16px;
+    letter-spacing: 0;
   }
-  button, input, select, textarea {
+  button,
+  input,
+  select,
+  textarea {
     font: inherit;
   }
-  img, video, canvas {
+  img,
+  video,
+  canvas {
     max-width: 100%;
   }
 }
@@ -121,5 +134,110 @@
   }
 }
 
-.camera-landscape-stage { min-height: 0; }
-@media (orientation: portrait) { .camera-landscape-stage video { object-fit: contain; } }
+.camera-landscape-stage {
+  min-height: 0;
+}
+@media (orientation: portrait) {
+  .camera-landscape-stage video {
+    object-fit: contain;
+  }
+}
+
+@media (min-width: 768px) {
+  body {
+    padding-bottom: 0;
+  }
+}
+.workspace-cover {
+  height: 300px;
+}
+.workspace-copy {
+  margin-inline-end: auto;
+  background: linear-gradient(to left, var(--cover-wash) 70%, transparent);
+}
+[dir="ltr"] .workspace-copy {
+  background: linear-gradient(to right, var(--cover-wash) 70%, transparent);
+}
+[dir="rtl"] .workspace-cover > img {
+  transform: scaleX(-1);
+}
+.workflow-action {
+  transition:
+    transform 180ms,
+    border-color 180ms,
+    background-color 180ms;
+  gap: 1rem;
+}
+.workflow-action svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.workflow-action .workflow-icon svg,
+.workflow-action .bg-signature-soft svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.workflow-scan {
+  border-color: var(--primary);
+}
+.workflow-icon {
+  background: color-mix(in oklch, var(--primary-foreground) 15%, transparent);
+}
+.scan-paper-scene {
+  position: relative;
+  min-height: 350px;
+  display: grid;
+  place-items: center;
+  background: var(--secondary);
+  overflow: hidden;
+}
+.scan-paper {
+  width: 200px;
+  height: 275px;
+  padding: 24px;
+  background: var(--card);
+  box-shadow: var(--shadow-lift-v);
+  transform: rotate(-5deg);
+}
+.scan-mark {
+  color: var(--primary);
+  margin-bottom: 20px;
+}
+.scan-lines {
+  height: 4px;
+  margin: 12px 0;
+  background: var(--border);
+}
+.scan-lines.short {
+  width: 65%;
+}
+.scan-photo {
+  height: 65px;
+  margin: 18px 0;
+  background: var(--signature-soft);
+  border-inline-start: 6px solid var(--accent);
+}
+.scan-outline {
+  position: absolute;
+  width: 235px;
+  height: 310px;
+  border: 2px dashed var(--primary);
+}
+@media (min-width: 768px) {
+  .workspace-cover {
+    height: 320px;
+  }
+}
+@media (max-width: 767px) {
+  .workspace-copy {
+    max-width: 75%;
+  }
+  .workspace-cover > img {
+    object-position: 60% center;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workflow-action:hover {
+    transform: translateY(-2px);
+  }
+}

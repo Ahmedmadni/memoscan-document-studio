@@ -24,8 +24,7 @@ export const Route = createFileRoute("/documents")({
       { title: "My documents — Waraqah" },
       {
         name: "description",
-        content:
-          "Browse and organize your locally stored Waraqah documents.",
+        content: "Browse and organize your locally stored Waraqah documents.",
       },
       { property: "og:title", content: "My documents — Waraqah" },
       { property: "og:type", content: "website" },
@@ -48,7 +47,10 @@ function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<DocumentSort>("newest");
-  const visibleDocs = useMemo(() => filterDocuments(docs ?? [], query, sort, lang), [docs, query, sort, lang]);
+  const visibleDocs = useMemo(
+    () => filterDocuments(docs ?? [], query, sort, lang),
+    [docs, query, sort, lang],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -94,16 +96,43 @@ function DocumentsPage() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto max-w-5xl px-4 pb-16">
-        <PageHeading title={t("myDocs")} action={<Button onClick={newEmpty}><Plus />{t("newDoc")}</Button>}>
-          <span className="inline-flex items-center gap-2">{t("localBadge")}{docs && <span className="text-primary">· {docs.length}</span>}</span>
+        <PageHeading
+          title={t("myDocs")}
+          action={
+            <Button onClick={newEmpty}>
+              <Plus />
+              {t("newDoc")}
+            </Button>
+          }
+        >
+          <span className="inline-flex items-center gap-2">
+            {t("localBadge")}
+            {docs && <span className="text-primary">· {docs.length}</span>}
+          </span>
         </PageHeading>
         <div className="mb-6 flex flex-wrap gap-3">
           <div className="relative min-w-0 flex-1 basis-48">
             <Search className="pointer-events-none absolute start-3 top-3 size-4 text-muted-foreground" />
-            <input aria-label={t("searchDocs")} placeholder={t("searchDocs")} value={query} onChange={(e) => setQuery(e.target.value)} className="h-10 w-full rounded-md border bg-card pe-3 ps-10 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            <input
+              aria-label={t("searchDocs")}
+              placeholder={t("searchDocs")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-10 w-full rounded-md border bg-card pe-3 ps-10 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
           </div>
-          <select aria-label={t("sortDocs")} value={sort} onChange={(e) => { const value = e.target.value; if (value === "newest" || value === "oldest" || value === "name") setSort(value); }} className="h-10 max-w-full rounded-md border bg-card px-3 text-sm">
-            <option value="newest">{t("sortNewest")}</option><option value="oldest">{t("sortOldest")}</option><option value="name">{t("sortName")}</option>
+          <select
+            aria-label={t("sortDocs")}
+            value={sort}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "newest" || value === "oldest" || value === "name") setSort(value);
+            }}
+            className="h-10 max-w-full rounded-md border bg-card px-3 text-sm"
+          >
+            <option value="newest">{t("sortNewest")}</option>
+            <option value="oldest">{t("sortOldest")}</option>
+            <option value="name">{t("sortName")}</option>
           </select>
         </div>
         {error && (
@@ -116,15 +145,26 @@ function DocumentsPage() {
             <Loader2 className="size-4 animate-spin" /> {t("loading")}
           </p>
         )}
-        {docs?.length === 0 && <div className="py-16 text-center">
-          <FileText className="mx-auto size-10 text-muted-foreground" />
-          <h2 className="mt-4 text-lg font-semibold">{t("emptyTitle")}</h2>
-          <Button className="mt-5" asChild><Link to="/scan"><Plus />{t("scanDocuments")}</Link></Button>
-        </div>}
-        {!!docs?.length && visibleDocs.length === 0 && <div className="py-12 text-center">
-          <p className="text-muted-foreground">{t("noResults")}</p>
-          <Button variant="ghost" className="mt-3" onClick={() => setQuery("")}>{t("clearSearch")}</Button>
-        </div>}
+        {docs?.length === 0 && (
+          <div className="py-16 text-center">
+            <FileText className="mx-auto size-10 text-muted-foreground" />
+            <h2 className="mt-4 text-lg font-semibold">{t("emptyTitle")}</h2>
+            <Button className="mt-5" asChild>
+              <Link to="/scan">
+                <Plus />
+                {t("scanDocuments")}
+              </Link>
+            </Button>
+          </div>
+        )}
+        {!!docs?.length && visibleDocs.length === 0 && (
+          <div className="py-12 text-center">
+            <p className="text-muted-foreground">{t("noResults")}</p>
+            <Button variant="ghost" className="mt-3" onClick={() => setQuery("")}>
+              {t("clearSearch")}
+            </Button>
+          </div>
+        )}
         {!!docs?.length && (
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {visibleDocs.map((d) => (

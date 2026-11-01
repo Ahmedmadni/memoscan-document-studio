@@ -57,14 +57,14 @@ export const Route = createFileRoute("/doc/$id")({
       { title: "Document — Waraqah" },
       {
         name: "description",
-        content: "Edit scanned pages, prepare PDFs and sign documents on your device.",
+        content: "Edit scanned pages, arrange document order and export PDFs on your device.",
       },
       { property: "og:title", content: "Document — Waraqah" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
-        content: "Private on-device document editing, scanning and PDF signing.",
+        content: "Private on-device page editing, ordering and PDF export.",
       },
     ],
   }),
@@ -138,7 +138,7 @@ function DocPage() {
     return (
       <Shell>
         <p>{t("notFound")}</p>
-        <Link to="/" className="text-primary underline">
+        <Link to="/documents" className="text-primary underline">
           {t("back")}
         </Link>
       </Shell>
@@ -185,7 +185,7 @@ function DocPage() {
       <AppHeader
         start={
           <Link
-            to="/"
+            to="/documents"
             aria-label={t("back")}
             className="grid size-9 place-items-center rounded-md hover:bg-muted"
           >
@@ -278,7 +278,7 @@ function DocPage() {
         />
 
         {pages.length > 0 && (
-          <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-paper">
+          <section className="space-y-4 border-t pt-6">
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
             <Choice
               label={t("quality")}

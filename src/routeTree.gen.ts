@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ScanRouteImport } from './routes/scan'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignRouteImport } from './routes/sign'
 import { Route as DocIdRouteImport } from './routes/doc.$id'
 
@@ -19,9 +22,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScanRoute = ScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignRoute = SignRouteImport.update({
@@ -37,34 +55,68 @@ const DocIdRoute = DocIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/documents': typeof DocumentsRoute
   '/privacy': typeof PrivacyRoute
+  '/scan': typeof ScanRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/documents': typeof DocumentsRoute
   '/privacy': typeof PrivacyRoute
+  '/scan': typeof ScanRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/documents': typeof DocumentsRoute
   '/privacy': typeof PrivacyRoute
+  '/scan': typeof ScanRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/doc/$id': typeof DocIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/privacy' | '/sign' | '/doc/$id'
+  fullPaths:
+    | '/'
+    | '/documents'
+    | '/privacy'
+    | '/scan'
+    | '/settings'
+    | '/sign'
+    | '/doc/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/privacy' | '/sign' | '/doc/$id'
-  id: '__root__' | '/' | '/privacy' | '/sign' | '/doc/$id'
+  to:
+    | '/'
+    | '/documents'
+    | '/privacy'
+    | '/scan'
+    | '/settings'
+    | '/sign'
+    | '/doc/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/documents'
+    | '/privacy'
+    | '/scan'
+    | '/settings'
+    | '/sign'
+    | '/doc/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DocumentsRoute: typeof DocumentsRoute
   PrivacyRoute: typeof PrivacyRoute
+  ScanRoute: typeof ScanRoute
+  SettingsRoute: typeof SettingsRoute
   SignRoute: typeof SignRoute
   DocIdRoute: typeof DocIdRoute
 }
@@ -78,11 +130,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scan': {
+      id: '/scan'
+      path: '/scan'
+      fullPath: '/scan'
+      preLoaderRoute: typeof ScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign': {
@@ -104,7 +177,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocumentsRoute: DocumentsRoute,
   PrivacyRoute: PrivacyRoute,
+  ScanRoute: ScanRoute,
+  SettingsRoute: SettingsRoute,
   SignRoute: SignRoute,
   DocIdRoute: DocIdRoute,
 }

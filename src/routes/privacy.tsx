@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CloudOff, HardDrive, ShieldCheck } from "lucide-react";
+import { PageHeading } from "@/components/PageHeading";
 import { AppHeader } from "@/components/AppHeader";
 import { useI18n } from "@/lib/i18n";
 
@@ -34,11 +35,11 @@ function Privacy() {
   return (
     <div className="min-h-screen">
       <AppHeader />
-      <main className="mx-auto max-w-2xl px-4 py-10">
-        <h1 className="text-3xl font-bold">{t("privacyTitle")}</h1>
+      <main className="mx-auto max-w-2xl px-5 pb-16">
+        <PageHeading title={t("privacyTitle")} />
         <ul className="mt-6 space-y-4">
           {items.map(({ icon: Icon, k }) => (
-            <li key={k} className="flex gap-4 rounded-xl border bg-card p-4 shadow-paper">
+            <li key={k} className="flex gap-4 border-b py-5">
               <Icon className="mt-0.5 size-5 shrink-0 text-primary" />
               <p className="leading-relaxed">{t(k)}</p>
             </li>
