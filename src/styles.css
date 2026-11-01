@@ -82,6 +82,7 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
   h1, h2, h3 {
     font-family: var(--font-sans);
@@ -119,3 +120,6 @@
     border-color: var(--color-primary);
   }
 }
+
+.camera-landscape-stage { min-height: 0; }
+@media (orientation: portrait) { .camera-landscape-stage video { object-fit: contain; } }
