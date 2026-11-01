@@ -66,6 +66,9 @@ function Home() {
   useEffect(() => {
     void load();
     void requestPersistence();
+    const openScan = () => setScanOpen(true);
+    window.addEventListener("waraqah:open-scan", openScan);
+    return () => window.removeEventListener("waraqah:open-scan", openScan);
   }, [load]);
 
   async function startWith(files: File[]) {
