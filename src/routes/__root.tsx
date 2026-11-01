@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
+import { BottomNav } from "@/components/BottomNav";
 
 function NotFoundComponent() {
   return (
@@ -128,6 +129,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <Outlet />
+        <BottomNav />
         <Toaster position="top-center" richColors />
       </I18nProvider>
     </QueryClientProvider>
