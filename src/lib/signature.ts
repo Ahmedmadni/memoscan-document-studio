@@ -86,6 +86,7 @@ export async function createSignedPdf(
   signature: SignatureImage | null,
   pageIndex: number,
   placement: Placement,
+  applyToAllPages = false,
 ) {
   if (!signature) throw new Error("BLANK_SIGNATURE");
   const format = imageFormat(signature.data.slice(5, signature.data.indexOf(";")));
@@ -95,9 +96,12 @@ export async function createSignedPdf(
   const pdf = await PDFDocument.load(bytes.slice());
   const image =
     format === "png" ? await pdf.embedPng(signature.data) : await pdf.embedJpg(signature.data);
-  pdf
-    .getPage(pageIndex)
-    .drawImage(image, pdfImagePlacement(placement, image.height / image.width, geometry));
+  const targets = applyToAllPages ? pages.map((_, index) => index) : [pageIndex];
+  for (const index of targets) {
+    const targetGeometry = pages[index];
+    const targetPlacement = clampPlacement(placement, image.height / image.width, targetGeometry);
+    pdf.getPage(index).drawImage(image, pdfImagePlacement(targetPlacement, image.height / image.width, targetGeometry));
+  }
   return pdf.save();
 }
 
