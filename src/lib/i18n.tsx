@@ -4,6 +4,17 @@ export type Lang = "ar" | "en";
 
 const dict = {
   signTitle: { ar: "إضافة التوقيعات", en: "Add signature" },
+  captureMode: { ar: "وضع التصوير", en: "Capture mode" },
+  singleShot: { ar: "فردي", en: "Single" },
+  multiShot: { ar: "متعدد", en: "Multiple" },
+  livePageEdges: { ar: "حدود الورقة المكتشفة", en: "Detected page edges" },
+  navHome: { ar: "الرئيسية", en: "Home" },
+  navScan: { ar: "مسح", en: "Scan" },
+  navSign: { ar: "توقيع", en: "Sign" },
+  navSettings: { ar: "الإعدادات", en: "Settings" },
+  signScope: { ar: "نطاق التوقيع", en: "Signature scope" },
+  signCurrentPage: { ar: "الصفحة الحالية فقط", en: "Current page only" },
+  signAllPages: { ar: "كل صفحات الملف", en: "All PDF pages" },
   scanDocuments: { ar: "مسح المستندات", en: "Scan Documents" },
   addSignature: { ar: "إضافة توقيع", en: "Add Signature" },
   signIntro: {
