@@ -64,6 +64,11 @@ export function ImagePickers({
         }
         stream.current = media;
         try {
+          const { StatusBar } = await import("@capacitor/status-bar");
+          await StatusBar.setOverlaysWebView({ overlay: false });
+          await StatusBar.show();
+        } catch { /* Browser preview has no native status bar. */ }
+        try {
           const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
           await orientation.lock("landscape");
         } catch { /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */ }
