@@ -7,7 +7,7 @@ export async function renderSigningPage(
   canvas: HTMLCanvasElement,
   signal: AbortSignal,
 ) {
-  const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
+  const pdfjs = await import("pdfjs-dist");
   if (signal.aborted) return;
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   const loading = pdfjs.getDocument({ data: bytes.slice() });

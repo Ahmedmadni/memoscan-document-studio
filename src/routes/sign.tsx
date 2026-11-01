@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, Eraser, FileSignature, ImagePlus, Upload } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Download, Eraser, FileSignature, ImagePlus, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { PageHeading } from "@/components/PageHeading";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -186,23 +187,13 @@ export function SignPage() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto max-w-6xl px-4 pb-16">
-        <div className="mb-6 flex items-center gap-3 pt-6">
-          <Button variant="ghost" size="icon" aria-label={t("back")} asChild>
-            <Link to="/">
-              <ArrowLeft className="rtl:rotate-180" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{t("signTitle")}</h1>
-            <p className="text-sm text-muted-foreground">{t("signIntro")}</p>
-          </div>
-        </div>
+        <PageHeading title={t("signTitle")} />
         {error && (
           <p role="alert" className="mb-4 text-sm text-destructive">
             {error}
           </p>
         )}
-        <section className="mb-6 grid gap-4 rounded-2xl border bg-card p-4 md:grid-cols-2">
+        <section className="mb-6 grid gap-6 border-b pb-6 md:grid-cols-2">
           <div className="min-w-0">
             <h2 className="mb-2 font-semibold">{t("signPdf")}</h2>
             <input
@@ -273,7 +264,7 @@ export function SignPage() {
           </p>
         )}
         {mode === "draw" && (
-          <section className="mb-6 rounded-2xl border bg-card p-4">
+          <section className="mb-6 border-b pb-6">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="font-semibold">{t("signBox")}</h2>
               <Button
@@ -296,7 +287,7 @@ export function SignPage() {
               aria-label={t("signBox")}
               width={900}
               height={220}
-              className="h-44 w-full touch-none rounded-xl border bg-card"
+              className="h-44 w-full touch-none rounded-lg border bg-card"
               onPointerDown={disabled ? undefined : startDraw}
               onPointerMove={moveDraw}
               onPointerUp={endDraw}
@@ -305,7 +296,7 @@ export function SignPage() {
           </section>
         )}
         {signature && (
-          <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4">
+          <section className="mb-6 flex flex-wrap items-center gap-4 border-b pb-6">
             <span className="text-sm font-medium">{t("signPreview")}</span>
             <img
               src={signature.data}
@@ -323,7 +314,7 @@ export function SignPage() {
           </section>
         )}
         {pdf && (
-          <section className="rounded-2xl border bg-card p-4">
+          <section className="border-t pt-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{t("signPlace")}</h2>
               <div className="flex items-center gap-2">
@@ -357,11 +348,21 @@ export function SignPage() {
             <fieldset className="mb-4 flex flex-wrap items-center gap-3 text-sm">
               <legend className="mb-2 font-medium">{t("signScope")}</legend>
               <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2">
-                <input type="radio" name="signature-scope" checked={!applyToAllPages} onChange={() => setApplyToAllPages(false)} />
+                <input
+                  type="radio"
+                  name="signature-scope"
+                  checked={!applyToAllPages}
+                  onChange={() => setApplyToAllPages(false)}
+                />
                 {t("signCurrentPage")}
               </label>
               <label className="inline-flex items-center gap-2 rounded-lg border px-3 py-2">
-                <input type="radio" name="signature-scope" checked={applyToAllPages} onChange={() => setApplyToAllPages(true)} />
+                <input
+                  type="radio"
+                  name="signature-scope"
+                  checked={applyToAllPages}
+                  onChange={() => setApplyToAllPages(true)}
+                />
                 {t("signAllPages")}
               </label>
             </fieldset>
