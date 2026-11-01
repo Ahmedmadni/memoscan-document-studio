@@ -247,9 +247,28 @@ export function ImagePickers({
               className="h-full w-full object-contain"
             />
             {liveCorners && (
-              <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label={t("livePageEdges")}>
-                <polygon points={liveCorners.map((p) => `${p.x},${p.y}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth="0.006" vectorEffect="non-scaling-stroke" />
-                {liveCorners.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="0.012" fill="#39e6ad" />)}
+              <svg
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                viewBox={`0 0 ${video.current?.videoWidth || 1} ${video.current?.videoHeight || 1}`}
+                preserveAspectRatio="xMidYMid meet"
+                aria-label={t("livePageEdges")}
+              >
+                <polygon
+                  points={liveCorners.map((p) => `${p.x * (video.current?.videoWidth || 1)},${p.y * (video.current?.videoHeight || 1)}`).join(" ")}
+                  fill="rgba(45,190,150,.12)"
+                  stroke="#39e6ad"
+                  strokeWidth="3"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {liveCorners.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x * (video.current?.videoWidth || 1)}
+                    cy={p.y * (video.current?.videoHeight || 1)}
+                    r="7"
+                    fill="#39e6ad"
+                  />
+                ))}
               </svg>
             )}
             {cameraError && (
