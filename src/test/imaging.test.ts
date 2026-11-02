@@ -109,8 +109,13 @@ describe("image decoding safeguards", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       drawImage,
     } as unknown as CanvasRenderingContext2D);
+    // Prevent jsdom's unimplemented Image decoder from waiting for its timeout
+    // after the expected bitmap drawing failure falls through to the fallback.
+    vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+      throw new Error("IMAGE_FALLBACK_UNAVAILABLE");
+    });
 
-    await expect(loadImageCanvas(new Blob(["image"]))).rejects.toThrow();
+    await expect(loadImageCanvas(new Blob(["image"]))).rejects.toThrow("IMAGE_FALLBACK_UNAVAILABLE");
     expect(bitmap.close).toHaveBeenCalledOnce();
   });
 });
