@@ -40,6 +40,7 @@ import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
 import { PendingDeletes } from "@/lib/pendingDeletes";
+import { isNative } from "@/lib/native";
 import {
   canShareFile,
   downloadBlob,
@@ -321,13 +322,13 @@ function DocPage() {
                   <span className="text-sm text-success">
                     {t("pdfReady")} · {formatBytes(pdf.size)}
                   </span>
-                  <Button
+                  {!isNative() && <Button
                     variant="outline"
                     onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
                   >
                     <Download />
                     {t("download")}
-                  </Button>
+                  </Button>}
                   <Button
                     variant="outline"
                     onClick={async () => {

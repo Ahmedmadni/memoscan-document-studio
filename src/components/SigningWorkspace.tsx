@@ -4,7 +4,8 @@ import { PageHeading } from "@/components/PageHeading";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { downloadBlob } from "@/lib/pdf";
+import { downloadBlob, safeFilename, shareFile } from "@/lib/pdf";
+import { isNative } from "@/lib/native";
 import {
   clampPlacement,
   createSignedPdf,
@@ -149,9 +150,10 @@ export function SigningWorkspace() {
     try {
       const bytes = await createSignedPdf(pdf.bytes, signature, pageIndex, safe, applyToAllPages);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-      const name = pdf.name.replace(/\.pdf$/i, "") + "-signed.pdf";
-      const { isNative, savePdfNative, shareFileNative } = await import("@/lib/native");
-      if (isNative()) await shareFileNative(await savePdfNative(blob, name), name);
+      const name = safeFilename(pdf.name.replace(/\.pdf$/i, "") + "-signed");
+      if (isNative()) {
+        if ((await shareFile(blob, name)) === "cancelled") return;
+      }
       else downloadBlob(blob, name);
       toast.success(t("signSuccess"));
     } catch {
