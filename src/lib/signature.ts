@@ -100,7 +100,12 @@ export async function createSignedPdf(
   for (const index of targets) {
     const targetGeometry = pages[index];
     const targetPlacement = clampPlacement(placement, image.height / image.width, targetGeometry);
-    pdf.getPage(index).drawImage(image, pdfImagePlacement(targetPlacement, image.height / image.width, targetGeometry));
+    pdf
+      .getPage(index)
+      .drawImage(
+        image,
+        pdfImagePlacement(targetPlacement, image.height / image.width, targetGeometry),
+      );
   }
   return pdf.save();
 }
