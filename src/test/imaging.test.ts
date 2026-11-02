@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyHomography,
   flattenPaperLighting,
@@ -7,6 +7,7 @@ import {
   otsu,
   solveHomography,
   FULL_CORNERS,
+  loadImageCanvas,
 } from "@/lib/imaging";
 
 describe("imaging", () => {
@@ -79,5 +80,37 @@ describe("imaging", () => {
         { x: 0, y: 1 },
       ]),
     ).toBe(false);
+  });
+});
+
+describe("image decoding safeguards", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("rejects invalid output dimensions before attempting to decode", async () => {
+    await expect(loadImageCanvas(new Blob(["image"]), 0)).rejects.toThrow("INVALID_IMAGE_SIZE");
+    await expect(loadImageCanvas(new Blob(["image"]), Number.POSITIVE_INFINITY)).rejects.toThrow(
+      "INVALID_IMAGE_SIZE",
+    );
+  });
+
+  it("releases ImageBitmap memory when canvas drawing fails", async () => {
+    const bitmap = {
+      width: 120,
+      height: 80,
+      close: vi.fn(),
+    } as unknown as ImageBitmap;
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue(bitmap));
+    const drawImage = vi.fn(() => {
+      throw new Error("CANVAS_DRAW_FAILED");
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D);
+
+    await expect(loadImageCanvas(new Blob(["image"]))).rejects.toThrow();
+    expect(bitmap.close).toHaveBeenCalledOnce();
   });
 });
