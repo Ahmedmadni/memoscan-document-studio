@@ -139,6 +139,14 @@
 .camera-landscape-stage {
   min-height: 0;
 }
+.camera-quad {
+  fill: var(--camera-edge-fill);
+  stroke: var(--camera-edge);
+}
+.camera-corner {
+  fill: var(--camera-edge);
+  stroke: var(--stage-foreground);
+}
 @media (orientation: portrait) {
   .camera-landscape-stage video {
     object-fit: contain;
