@@ -49,6 +49,8 @@
   --signature-soft: oklch(0.96 0.025 30);
   --cover-wash: oklch(0.96 0.006 210);
   --signature-ink: #142b55;
+  --camera-edge: oklch(0.83 0.15 160);
+  --camera-edge-fill: oklch(0.83 0.15 160 / 12%);
   --radius: 0.5rem;
   --background: oklch(0.985 0.003 210);
   --foreground: oklch(0.22 0.025 220);
@@ -149,7 +151,7 @@
   }
 }
 .workspace-cover {
-  height: 300px;
+  height: 250px;
 }
 .workspace-copy {
   margin-inline-end: auto;
