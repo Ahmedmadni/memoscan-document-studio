@@ -319,12 +319,15 @@ function toGray(d: Uint8ClampedArray) {
 export function flattenPaperLighting(img: ImageData) {
   const { width: w, height: h, data } = img;
   const stride = w + 1;
-  const integral = new Float64Array((w + 1) * (h + 1));
+  // The maximum possible sum is 255 * 2400 * 2400 (< 2^32), so an
+  // integer integral image is exact after rounding luminance and uses half
+  // the memory of Float64Array on mobile devices.
+  const integral = new Uint32Array((w + 1) * (h + 1));
   for (let y = 0; y < h; y++) {
     let row = 0;
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      row += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      row += Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
       integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + row;
     }
   }
@@ -374,7 +377,9 @@ function sharpen(img: ImageData, amount: number) {
 /** Adaptive (local mean) threshold via integral image — robust to uneven lighting. */
 function adaptiveThreshold(img: ImageData, offset: number) {
   const { width: w, height: h, data: d } = img;
-  const integral = new Float64Array((w + 1) * (h + 1));
+  // Grayscale channel values are integers; the maximum cumulative sum at
+  // the 2400px processing limit fits safely in an unsigned 32-bit integer.
+  const integral = new Uint32Array((w + 1) * (h + 1));
   for (let y = 0; y < h; y++) {
     let row = 0;
     for (let x = 0; x < w; x++) {
