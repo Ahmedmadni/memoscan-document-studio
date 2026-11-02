@@ -34,12 +34,10 @@ function Home() {
     void listDocs()
       .then(async (docs) =>
         Promise.all(
-          docs
-            .slice(0, 3)
-            .map(async (doc) => ({
-              ...doc,
-              thumb: doc.pageIds[0] ? (await getPage(doc.pageIds[0]))?.thumb : undefined,
-            })),
+          docs.slice(0, 3).map(async (doc) => ({
+            ...doc,
+            thumb: doc.pageIds[0] ? (await getPage(doc.pageIds[0]))?.thumb : undefined,
+          })),
         ),
       )
       .then((docs) => {
@@ -68,7 +66,9 @@ function Home() {
               {t("appName")}
               <span className="ms-3 inline-block size-2 rounded-full bg-accent" />
             </h1>
-            <p className="mt-3 text-base font-medium text-foreground md:text-lg">{t("homeSubtitle")}</p>
+            <p className="mt-3 text-base font-medium text-foreground md:text-lg">
+              {t("homeSubtitle")}
+            </p>
             <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="size-4 text-primary" />
               {t("privacyShort")}

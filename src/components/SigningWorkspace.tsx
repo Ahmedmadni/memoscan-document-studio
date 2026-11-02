@@ -153,8 +153,7 @@ export function SigningWorkspace() {
       const name = safeFilename(pdf.name.replace(/\.pdf$/i, "") + "-signed");
       if (isNative()) {
         if ((await shareFile(blob, name)) === "cancelled") return;
-      }
-      else downloadBlob(blob, name);
+      } else downloadBlob(blob, name);
       toast.success(t("signSuccess"));
     } catch {
       setError(t("signExportError"));

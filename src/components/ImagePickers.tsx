@@ -1,5 +1,12 @@
 import { Camera, Check, ImagePlus, Minus, X } from "lucide-react";
-import { detectDocument, FULL_CORNERS, isConvexQuad, loadImageCanvas, warpPerspective, type Corners } from "@/lib/imaging";
+import {
+  detectDocument,
+  FULL_CORNERS,
+  isConvexQuad,
+  loadImageCanvas,
+  warpPerspective,
+  type Corners,
+} from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -31,8 +38,16 @@ export function ImagePickers({
   const [reviewCorners, setReviewCorners] = useState<Corners>(FULL_CORNERS);
   const [activeCorner, setActiveCorner] = useState<number | null>(null);
   const [reviewImageSize, setReviewImageSize] = useState({ width: 0, height: 0 });
-  const reviewUrl = useMemo(() => reviewFile ? URL.createObjectURL(reviewFile) : null, [reviewFile]);
-  useEffect(() => () => { if (reviewUrl) URL.revokeObjectURL(reviewUrl); }, [reviewUrl]);
+  const reviewUrl = useMemo(
+    () => (reviewFile ? URL.createObjectURL(reviewFile) : null),
+    [reviewFile],
+  );
+  useEffect(
+    () => () => {
+      if (reviewUrl) URL.revokeObjectURL(reviewUrl);
+    },
+    [reviewUrl],
+  );
   const previews = useMemo(
     () => captured.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [captured],
@@ -46,7 +61,11 @@ export function ImagePickers({
       stream.current = null;
       setCameraReady(false);
       setLiveCorners(null);
-      try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
+      try {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+      } catch {
+        /* ignored */
+      }
       return;
     }
     let active = true;
@@ -71,11 +90,15 @@ export function ImagePickers({
           const { StatusBar } = await import("@capacitor/status-bar");
           await StatusBar.setOverlaysWebView({ overlay: false });
           await StatusBar.show();
-        } catch { /* Browser preview has no native status bar. */ }
+        } catch {
+          /* Browser preview has no native status bar. */
+        }
         try {
           const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
           await orientation.lock("landscape");
-        } catch { /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */ }
+        } catch {
+          /* Orientation lock is best-effort; CSS still provides a landscape camera stage. */
+        }
         if (video.current) {
           video.current.srcObject = media;
           await video.current.play();
@@ -86,13 +109,15 @@ export function ImagePickers({
             try {
               const sample = document.createElement("canvas");
               sample.width = 320;
-              sample.height = Math.round(320 * source.videoHeight / source.videoWidth);
+              sample.height = Math.round((320 * source.videoHeight) / source.videoWidth);
               const context = sample.getContext("2d");
               if (!context) return;
               context.drawImage(source, 0, 0, sample.width, sample.height);
               const result = detectDocument(sample);
               setLiveCorners(result.detected ? result.corners : null);
-            } catch { setLiveCorners(null); }
+            } catch {
+              setLiveCorners(null);
+            }
           }, 550);
         }
       } catch {
@@ -109,7 +134,11 @@ export function ImagePickers({
       stream.current = null;
       setCameraReady(false);
       setLiveCorners(null);
-      try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignored */ }
+      try {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+      } catch {
+        /* ignored */
+      }
     };
   }, [cameraOpen, t]);
 
@@ -178,9 +207,16 @@ export function ImagePickers({
       const source = await loadImageCanvas(reviewFile, 3000);
       const cropped = warpPerspective(source, reviewCorners, 3000);
       const blob = await new Promise<Blob>((resolve, reject) =>
-        cropped.toBlob((value) => value ? resolve(value) : reject(new Error("CROP_FAILED")), "image/jpeg", 0.95),
+        cropped.toBlob(
+          (value) => (value ? resolve(value) : reject(new Error("CROP_FAILED"))),
+          "image/jpeg",
+          0.95,
+        ),
       );
-      const file = new File([blob], reviewFile.name, { type: "image/jpeg", lastModified: Date.now() });
+      const file = new File([blob], reviewFile.name, {
+        type: "image/jpeg",
+        lastModified: Date.now(),
+      });
       if (revision !== captureRevision.current) return;
       setReviewFile(null);
       setReviewImageSize({ width: 0, height: 0 });
@@ -249,78 +285,157 @@ export function ImagePickers({
           </header>
 
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-stage camera-landscape-stage">
-            <video ref={video} autoPlay muted playsInline className={`h-full w-full object-contain ${reviewFile ? "hidden" : ""}`} />
+            <video
+              ref={video}
+              autoPlay
+              muted
+              playsInline
+              className={`h-full w-full object-contain ${reviewFile ? "hidden" : ""}`}
+            />
             {reviewFile && reviewUrl ? (
               <div className="relative flex h-full w-full items-center justify-center p-4">
-                <img src={reviewUrl} alt={t("page")} className="max-h-full max-w-full object-contain" draggable={false}
-                  onLoad={(e) => setReviewImageSize({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} />
-                {reviewImageSize.width > 0 && reviewImageSize.height > 0 && <svg
-                  className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none"
-                  viewBox={`0 0 ${reviewImageSize.width} ${reviewImageSize.height}`}
-                  preserveAspectRatio="xMidYMid meet"
-                  onPointerMove={(e) => {
-                    if (activeCorner === null) return;
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const scale = Math.min(r.width / reviewImageSize.width, r.height / reviewImageSize.height);
-                    const renderedWidth = reviewImageSize.width * scale;
-                    const renderedHeight = reviewImageSize.height * scale;
-                    const offsetX = (r.width - renderedWidth) / 2;
-                    const offsetY = (r.height - renderedHeight) / 2;
-                    const x = Math.max(0, Math.min(1, (e.clientX - r.left - offsetX) / renderedWidth));
-                    const y = Math.max(0, Math.min(1, (e.clientY - r.top - offsetY) / renderedHeight));
-                    setReviewCorners((old) => old.map((p,i) => i === activeCorner ? {x,y} : p) as Corners);
-                  }}
-                  onPointerUp={() => setActiveCorner(null)}
-                  onPointerCancel={() => setActiveCorner(null)}>
-                  <polygon className="camera-quad" points={reviewCorners.map(p => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`).join(" ")} strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .004)} vectorEffect="non-scaling-stroke" />
-                  {reviewCorners.map((p,i) => <circle className="camera-corner" key={i} cx={p.x * reviewImageSize.width} cy={p.y * reviewImageSize.height} r={Math.max(12, Math.min(reviewImageSize.width, reviewImageSize.height) * .025)} strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .003)} onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
-                </svg>}
-              </div>
-            ) : <>
-            {liveCorners && (
-              <svg
-                className="pointer-events-none absolute inset-0 h-full w-full"
-                viewBox={`0 0 ${video.current?.videoWidth || 1} ${video.current?.videoHeight || 1}`}
-                preserveAspectRatio="xMidYMid meet"
-                aria-label={t("livePageEdges")}
-              >
-                <polygon
-                  points={liveCorners.map((p) => `${p.x * (video.current?.videoWidth || 1)},${p.y * (video.current?.videoHeight || 1)}`).join(" ")}
-                  className="camera-quad"
-                  strokeWidth="3"
-                  vectorEffect="non-scaling-stroke"
+                <img
+                  src={reviewUrl}
+                  alt={t("page")}
+                  className="max-h-full max-w-full object-contain"
+                  draggable={false}
+                  onLoad={(e) =>
+                    setReviewImageSize({
+                      width: e.currentTarget.naturalWidth,
+                      height: e.currentTarget.naturalHeight,
+                    })
+                  }
                 />
-                {liveCorners.map((p, i) => (
-                  <circle
-                    key={i}
-                    cx={p.x * (video.current?.videoWidth || 1)}
-                    cy={p.y * (video.current?.videoHeight || 1)}
-                    r="7"
-                    className="camera-corner"
-                  />
-                ))}
-              </svg>
-            )}
-            {cameraError && (
-              <div
-                className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
-                role="alert"
-              >
-                {cameraError}
+                {reviewImageSize.width > 0 && reviewImageSize.height > 0 && (
+                  <svg
+                    className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none"
+                    viewBox={`0 0 ${reviewImageSize.width} ${reviewImageSize.height}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    onPointerMove={(e) => {
+                      if (activeCorner === null) return;
+                      const r = e.currentTarget.getBoundingClientRect();
+                      const scale = Math.min(
+                        r.width / reviewImageSize.width,
+                        r.height / reviewImageSize.height,
+                      );
+                      const renderedWidth = reviewImageSize.width * scale;
+                      const renderedHeight = reviewImageSize.height * scale;
+                      const offsetX = (r.width - renderedWidth) / 2;
+                      const offsetY = (r.height - renderedHeight) / 2;
+                      const x = Math.max(
+                        0,
+                        Math.min(1, (e.clientX - r.left - offsetX) / renderedWidth),
+                      );
+                      const y = Math.max(
+                        0,
+                        Math.min(1, (e.clientY - r.top - offsetY) / renderedHeight),
+                      );
+                      setReviewCorners(
+                        (old) => old.map((p, i) => (i === activeCorner ? { x, y } : p)) as Corners,
+                      );
+                    }}
+                    onPointerUp={() => setActiveCorner(null)}
+                    onPointerCancel={() => setActiveCorner(null)}
+                  >
+                    <polygon
+                      className="camera-quad"
+                      points={reviewCorners
+                        .map(
+                          (p) => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`,
+                        )
+                        .join(" ")}
+                      strokeWidth={Math.max(
+                        2,
+                        Math.min(reviewImageSize.width, reviewImageSize.height) * 0.004,
+                      )}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {reviewCorners.map((p, i) => (
+                      <circle
+                        className="camera-corner"
+                        key={i}
+                        cx={p.x * reviewImageSize.width}
+                        cy={p.y * reviewImageSize.height}
+                        r={Math.max(
+                          12,
+                          Math.min(reviewImageSize.width, reviewImageSize.height) * 0.025,
+                        )}
+                        strokeWidth={Math.max(
+                          2,
+                          Math.min(reviewImageSize.width, reviewImageSize.height) * 0.003,
+                        )}
+                        onPointerDown={(e) => {
+                          e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);
+                          setActiveCorner(i);
+                        }}
+                      />
+                    ))}
+                  </svg>
+                )}
               </div>
+            ) : (
+              <>
+                {liveCorners && (
+                  <svg
+                    className="pointer-events-none absolute inset-0 h-full w-full"
+                    viewBox={`0 0 ${video.current?.videoWidth || 1} ${video.current?.videoHeight || 1}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    aria-label={t("livePageEdges")}
+                  >
+                    <polygon
+                      points={liveCorners
+                        .map(
+                          (p) =>
+                            `${p.x * (video.current?.videoWidth || 1)},${p.y * (video.current?.videoHeight || 1)}`,
+                        )
+                        .join(" ")}
+                      className="camera-quad"
+                      strokeWidth="3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {liveCorners.map((p, i) => (
+                      <circle
+                        key={i}
+                        cx={p.x * (video.current?.videoWidth || 1)}
+                        cy={p.y * (video.current?.videoHeight || 1)}
+                        r="7"
+                        className="camera-corner"
+                      />
+                    ))}
+                  </svg>
+                )}
+                {cameraError && (
+                  <div
+                    className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
+                    role="alert"
+                  >
+                    {cameraError}
+                  </div>
+                )}
+                {!cameraError && !cameraReady && (
+                  <p className="absolute bottom-5 rounded-full bg-stage/60 px-4 py-2 text-sm">
+                    {t("cameraStarting")}
+                  </p>
+                )}
+              </>
             )}
-            {!cameraError && !cameraReady && (
-              <p className="absolute bottom-5 rounded-full bg-stage/60 px-4 py-2 text-sm">
-                {t("cameraStarting")}
-              </p>
-            )}
-            </>}
           </div>
 
           {reviewFile ? (
             <footer className="flex items-center justify-center gap-3 border-t border-stage-foreground/15 p-4">
-              <Button variant="outline" onClick={() => { setReviewFile(null); setReviewImageSize({ width: 0, height: 0 }); setActiveCorner(null); }}>{t("cancel")}</Button>
-              <Button disabled={reviewBusy} onClick={() => void acceptReview()}><Check /> {reviewBusy ? t("processing") : t("useCaptured")}</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setReviewFile(null);
+                  setReviewImageSize({ width: 0, height: 0 });
+                  setActiveCorner(null);
+                }}
+              >
+                {t("cancel")}
+              </Button>
+              <Button disabled={reviewBusy} onClick={() => void acceptReview()}>
+                <Check /> {reviewBusy ? t("processing") : t("useCaptured")}
+              </Button>
             </footer>
           ) : null}
 
@@ -336,7 +451,9 @@ export function ImagePickers({
                     alt={`${t("page")} ${index + 1}`}
                     className="h-full w-full object-cover"
                   />
-                  <Button size="icon" variant="ghost"
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     type="button"
                     aria-label={t("removeCaptured")}
                     onClick={() => setCaptured((items) => items.filter((_, i) => i !== index))}
@@ -350,9 +467,37 @@ export function ImagePickers({
           )}
 
           <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-stage-foreground/15 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex rounded-md border border-stage-foreground/25 p-1" role="group" aria-label={t("captureMode")}>
-              <Button size="sm" variant="ghost" onClick={() => setCaptureMode("single")} aria-pressed={captureMode === "single"} className={captureMode === "single" ? "bg-stage-foreground text-stage" : "text-stage-foreground"}>{t("singleShot")}</Button>
-              <Button size="sm" variant="ghost" onClick={() => setCaptureMode("multi")} aria-pressed={captureMode === "multi"} className={captureMode === "multi" ? "bg-stage-foreground text-stage" : "text-stage-foreground"}>{t("multiShot")}</Button>
+            <div
+              className="flex rounded-md border border-stage-foreground/25 p-1"
+              role="group"
+              aria-label={t("captureMode")}
+            >
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setCaptureMode("single")}
+                aria-pressed={captureMode === "single"}
+                className={
+                  captureMode === "single"
+                    ? "bg-stage-foreground text-stage"
+                    : "text-stage-foreground"
+                }
+              >
+                {t("singleShot")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setCaptureMode("multi")}
+                aria-pressed={captureMode === "multi"}
+                className={
+                  captureMode === "multi"
+                    ? "bg-stage-foreground text-stage"
+                    : "text-stage-foreground"
+                }
+              >
+                {t("multiShot")}
+              </Button>
             </div>
             <Button
               variant="outline"
@@ -368,7 +513,10 @@ export function ImagePickers({
             >
               <Camera /> {t("capturePage")}
             </Button>
-            <Button onClick={acceptCaptured} disabled={!captured.length || captureMode === "single" || !!reviewFile}>
+            <Button
+              onClick={acceptCaptured}
+              disabled={!captured.length || captureMode === "single" || !!reviewFile}
+            >
               <Check /> {t("useCaptured")} ({captured.length})
             </Button>
           </footer>

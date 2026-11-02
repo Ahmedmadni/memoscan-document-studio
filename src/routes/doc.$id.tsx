@@ -322,13 +322,15 @@ function DocPage() {
                   <span className="text-sm text-success">
                     {t("pdfReady")} · {formatBytes(pdf.size)}
                   </span>
-                  {!isNative() && <Button
-                    variant="outline"
-                    onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
-                  >
-                    <Download />
-                    {t("download")}
-                  </Button>}
+                  {!isNative() && (
+                    <Button
+                      variant="outline"
+                      onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
+                    >
+                      <Download />
+                      {t("download")}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     onClick={async () => {

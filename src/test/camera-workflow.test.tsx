@@ -30,7 +30,11 @@ async function openCamera() {
   } as unknown as CanvasRenderingContext2D);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:camera");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-  render(<I18nProvider><ImagePickers onFiles={vi.fn()} /></I18nProvider>);
+  render(
+    <I18nProvider>
+      <ImagePickers onFiles={vi.fn()} />
+    </I18nProvider>,
+  );
   fireEvent.click(screen.getByRole("button", { name: "التقاط بالكاميرا" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
   const video = document.querySelector("video");
@@ -42,11 +46,13 @@ async function openCamera() {
 
 describe("camera review lifecycle", () => {
   it("keeps the same live video when accepting a multi-shot review", async () => {
-    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => callback(new Blob(["image"], { type: "image/jpeg" })));
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
+      callback(new Blob(["image"], { type: "image/jpeg" })),
+    );
     const { video, stop } = await openCamera();
     const stream = video.srcObject;
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    fireEvent.click(screen.getByRole("button", { name: "مراجعة وإضافة", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /^مراجعة وإضافة$/ }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(document.querySelector("video")).toBe(video);
     expect(video.srcObject).toBe(stream);
@@ -56,7 +62,9 @@ describe("camera review lifecycle", () => {
 
   it("ignores an encoded capture after the camera is closed", async () => {
     let complete: BlobCallback | undefined;
-    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => { complete = callback; });
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      complete = callback;
+    });
     await openCamera();
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
     fireEvent.click(screen.getAllByRole("button", { name: "إلغاء" })[0]);
