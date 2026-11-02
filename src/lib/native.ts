@@ -49,7 +49,14 @@ export async function savePdfNative(blob: Blob, filename: string): Promise<strin
 }
 
 /** Open the native share sheet for a previously saved file URI. */
-export async function shareFileNative(uri: string, title: string): Promise<void> {
+export async function shareFileNative(uri: string, title: string): Promise<"shared" | "cancelled"> {
   const { Share } = await import("@capacitor/share");
-  await Share.share({ title, url: uri, dialogTitle: title });
+  try {
+    await Share.share({ title, url: uri, dialogTitle: title });
+    return "shared";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/cancel(?:led|ed)?|abort/i.test(message)) return "cancelled";
+    throw error;
+  }
 }

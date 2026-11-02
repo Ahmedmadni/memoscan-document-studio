@@ -1,5 +1,5 @@
 import { Camera, Check, ImagePlus, Minus, X } from "lucide-react";
-import { detectDocument, FULL_CORNERS, loadImageCanvas, warpPerspective, type Corners } from "@/lib/imaging";
+import { detectDocument, FULL_CORNERS, isConvexQuad, loadImageCanvas, warpPerspective, type Corners } from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -18,6 +18,9 @@ export function ImagePickers({
   const lib = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
+  const captureRevision = useRef(0);
+  const [capturing, setCapturing] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -100,6 +103,7 @@ export function ImagePickers({
     void startCamera();
     return () => {
       active = false;
+      captureRevision.current += 1;
       if (detectTimer) clearInterval(detectTimer);
       stream.current?.getTracks().forEach((track) => track.stop());
       stream.current = null;
@@ -116,6 +120,8 @@ export function ImagePickers({
   };
 
   const closeCamera = () => {
+    captureRevision.current += 1;
+    setCapturing(false);
     setCameraOpen(false);
     setCaptured([]);
     setCameraError("");
@@ -124,16 +130,25 @@ export function ImagePickers({
   };
 
   const capture = () => {
+    if (capturing) return;
     const element = video.current;
     if (!element || !element.videoWidth || !element.videoHeight) return;
+    const revision = ++captureRevision.current;
+    setCapturing(true);
     const canvas = document.createElement("canvas");
     canvas.width = element.videoWidth;
     canvas.height = element.videoHeight;
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      setCapturing(false);
+      setCameraError(t("captureFailed"));
+      return;
+    }
     context.drawImage(element, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(
       (blob) => {
+        if (revision !== captureRevision.current) return;
+        setCapturing(false);
         if (!blob) {
           setCameraError(t("captureFailed"));
           return;
@@ -152,7 +167,13 @@ export function ImagePickers({
   };
 
   const acceptReview = async () => {
-    if (!reviewFile) return;
+    if (!reviewFile || reviewBusy) return;
+    if (!isConvexQuad(reviewCorners)) {
+      setCameraError(t("detectFailed"));
+      return;
+    }
+    const revision = captureRevision.current;
+    setReviewBusy(true);
     try {
       const source = await loadImageCanvas(reviewFile, 3000);
       const cropped = warpPerspective(source, reviewCorners, 3000);
@@ -160,6 +181,7 @@ export function ImagePickers({
         cropped.toBlob((value) => value ? resolve(value) : reject(new Error("CROP_FAILED")), "image/jpeg", 0.95),
       );
       const file = new File([blob], reviewFile.name, { type: "image/jpeg", lastModified: Date.now() });
+      if (revision !== captureRevision.current) return;
       setReviewFile(null);
       setReviewImageSize({ width: 0, height: 0 });
       setActiveCorner(null);
@@ -171,6 +193,8 @@ export function ImagePickers({
       }
     } catch {
       setCameraError(t("captureFailed"));
+    } finally {
+      setReviewBusy(false);
     }
   };
 
@@ -201,22 +225,22 @@ export function ImagePickers({
 
       {cameraOpen && (
         <div
-          className="fixed inset-0 z-[70] flex flex-col bg-black text-white"
+          className="fixed inset-0 z-[70] flex flex-col bg-stage text-stage-foreground"
           role="dialog"
           aria-modal="true"
           aria-label={t("scanCamera")}
         >
-          <header className="flex items-center justify-between gap-3 border-b border-white/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <header className="flex items-center justify-between gap-3 border-b border-stage-foreground/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div>
               <p className="font-semibold">{t("scanCamera")}</p>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-stage-foreground/70">
                 {t("capturedPages")}: {captured.length}
               </p>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/15 hover:text-white"
+              className="text-stage-foreground hover:bg-stage-foreground/15 hover:text-stage-foreground"
               onClick={closeCamera}
               aria-label={t("cancel")}
             >
@@ -224,7 +248,8 @@ export function ImagePickers({
             </Button>
           </header>
 
-          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black camera-landscape-stage">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-stage camera-landscape-stage">
+            <video ref={video} autoPlay muted playsInline className={`h-full w-full object-contain ${reviewFile ? "hidden" : ""}`} />
             {reviewFile && reviewUrl ? (
               <div className="relative flex h-full w-full items-center justify-center p-4">
                 <img src={reviewUrl} alt={t("page")} className="max-h-full max-w-full object-contain" draggable={false}
@@ -247,17 +272,11 @@ export function ImagePickers({
                   }}
                   onPointerUp={() => setActiveCorner(null)}
                   onPointerCancel={() => setActiveCorner(null)}>
-                  <polygon points={reviewCorners.map(p => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`).join(" ")} fill="rgba(45,190,150,.12)" stroke="#39e6ad" strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .004)} vectorEffect="non-scaling-stroke" />
-                  {reviewCorners.map((p,i) => <circle key={i} cx={p.x * reviewImageSize.width} cy={p.y * reviewImageSize.height} r={Math.max(12, Math.min(reviewImageSize.width, reviewImageSize.height) * .025)} fill="#39e6ad" stroke="white" strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .003)} onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
+                  <polygon className="camera-quad" points={reviewCorners.map(p => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`).join(" ")} strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .004)} vectorEffect="non-scaling-stroke" />
+                  {reviewCorners.map((p,i) => <circle className="camera-corner" key={i} cx={p.x * reviewImageSize.width} cy={p.y * reviewImageSize.height} r={Math.max(12, Math.min(reviewImageSize.width, reviewImageSize.height) * .025)} strokeWidth={Math.max(2, Math.min(reviewImageSize.width, reviewImageSize.height) * .003)} onPointerDown={(e) => { e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId); setActiveCorner(i); }} />)}
                 </svg>}
               </div>
-            ) : <><video
-              ref={video}
-              autoPlay
-              muted
-              playsInline
-              className="h-full w-full object-contain"
-            />
+            ) : <>
             {liveCorners && (
               <svg
                 className="pointer-events-none absolute inset-0 h-full w-full"
@@ -267,8 +286,7 @@ export function ImagePickers({
               >
                 <polygon
                   points={liveCorners.map((p) => `${p.x * (video.current?.videoWidth || 1)},${p.y * (video.current?.videoHeight || 1)}`).join(" ")}
-                  fill="rgba(45,190,150,.12)"
-                  stroke="#39e6ad"
+                  className="camera-quad"
                   strokeWidth="3"
                   vectorEffect="non-scaling-stroke"
                 />
@@ -278,21 +296,21 @@ export function ImagePickers({
                     cx={p.x * (video.current?.videoWidth || 1)}
                     cy={p.y * (video.current?.videoHeight || 1)}
                     r="7"
-                    fill="#39e6ad"
+                    className="camera-corner"
                   />
                 ))}
               </svg>
             )}
             {cameraError && (
               <div
-                className="absolute inset-x-5 top-5 rounded-xl bg-red-950/90 p-4 text-sm"
+                className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
                 role="alert"
               >
                 {cameraError}
               </div>
             )}
             {!cameraError && !cameraReady && (
-              <p className="absolute bottom-5 rounded-full bg-black/60 px-4 py-2 text-sm">
+              <p className="absolute bottom-5 rounded-full bg-stage/60 px-4 py-2 text-sm">
                 {t("cameraStarting")}
               </p>
             )}
@@ -300,45 +318,45 @@ export function ImagePickers({
           </div>
 
           {reviewFile ? (
-            <footer className="flex items-center justify-center gap-3 border-t border-white/15 p-4">
+            <footer className="flex items-center justify-center gap-3 border-t border-stage-foreground/15 p-4">
               <Button variant="outline" onClick={() => { setReviewFile(null); setReviewImageSize({ width: 0, height: 0 }); setActiveCorner(null); }}>{t("cancel")}</Button>
-              <Button onClick={() => void acceptReview()}><Check /> {t("useCaptured")}</Button>
+              <Button disabled={reviewBusy} onClick={() => void acceptReview()}><Check /> {reviewBusy ? t("processing") : t("useCaptured")}</Button>
             </footer>
           ) : null}
 
           {previews.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto border-t border-white/15 px-3 py-2">
+            <div className="flex gap-2 overflow-x-auto border-t border-stage-foreground/15 px-3 py-2">
               {previews.map(({ file, url }, index) => (
                 <div
                   key={file.name}
-                  className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md border border-white/30"
+                  className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md border border-stage-foreground/30"
                 >
                   <img
                     src={url}
                     alt={`${t("page")} ${index + 1}`}
                     className="h-full w-full object-cover"
                   />
-                  <button
+                  <Button size="icon" variant="ghost"
                     type="button"
                     aria-label={t("removeCaptured")}
                     onClick={() => setCaptured((items) => items.filter((_, i) => i !== index))}
-                    className="absolute end-1 top-1 grid size-6 place-items-center rounded-full bg-black/75"
+                    className="absolute end-1 top-1 grid size-6 place-items-center rounded-full bg-stage/75 text-stage-foreground"
                   >
                     <Minus className="size-4" />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
 
-          <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-white/15 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex rounded-full border border-white/25 p-1" role="group" aria-label={t("captureMode")}>
-              <button type="button" onClick={() => setCaptureMode("single")} aria-pressed={captureMode === "single"} className={`rounded-full px-3 py-1.5 text-sm ${captureMode === "single" ? "bg-white text-black" : "text-white"}`}>{t("singleShot")}</button>
-              <button type="button" onClick={() => setCaptureMode("multi")} aria-pressed={captureMode === "multi"} className={`rounded-full px-3 py-1.5 text-sm ${captureMode === "multi" ? "bg-white text-black" : "text-white"}`}>{t("multiShot")}</button>
+          <footer className="flex flex-wrap items-center justify-center gap-3 border-t border-stage-foreground/15 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex rounded-md border border-stage-foreground/25 p-1" role="group" aria-label={t("captureMode")}>
+              <Button size="sm" variant="ghost" onClick={() => setCaptureMode("single")} aria-pressed={captureMode === "single"} className={captureMode === "single" ? "bg-stage-foreground text-stage" : "text-stage-foreground"}>{t("singleShot")}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setCaptureMode("multi")} aria-pressed={captureMode === "multi"} className={captureMode === "multi" ? "bg-stage-foreground text-stage" : "text-stage-foreground"}>{t("multiShot")}</Button>
             </div>
             <Button
               variant="outline"
-              className="border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              className="border-stage-foreground/30 bg-transparent text-stage-foreground hover:bg-stage-foreground/10 hover:text-stage-foreground"
               onClick={closeCamera}
             >
               {t("cancel")}
@@ -346,7 +364,7 @@ export function ImagePickers({
             <Button
               className="rounded-full"
               onClick={capture}
-              disabled={!!cameraError || !cameraReady || !!reviewFile}
+              disabled={capturing || !!cameraError || !cameraReady || !!reviewFile}
             >
               <Camera /> {t("capturePage")}
             </Button>

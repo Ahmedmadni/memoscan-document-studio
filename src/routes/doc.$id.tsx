@@ -40,6 +40,7 @@ import { errorKey } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { buildPage, renderOutputs } from "@/lib/pages";
 import { PendingDeletes } from "@/lib/pendingDeletes";
+import { isNative } from "@/lib/native";
 import {
   canShareFile,
   downloadBlob,
@@ -108,7 +109,8 @@ function DocPage() {
   }, [load]);
   useEffect(() => setPdf(null), [pages, quality, size]);
 
-  async function saveOrder(ids: string[], d = doc!) {
+  async function saveOrder(ids: string[], d = doc) {
+    if (!d) return;
     const next = { ...d, pageIds: ids, updatedAt: Date.now() };
     await putDoc(next);
     setDoc(next);
@@ -155,7 +157,8 @@ function DocPage() {
     if (next !== ids) void run("", () => saveOrder(next));
   };
   const softDeletePage = (p: PageRecord, index: number) => {
-    const manager = pendingDeletes.current!;
+    const manager = pendingDeletes.current;
+    if (!manager) return;
     void run("", async () => {
       const next = manager.softDelete(ids, p.id);
       if (next === ids) return;
@@ -319,13 +322,13 @@ function DocPage() {
                   <span className="text-sm text-success">
                     {t("pdfReady")} · {formatBytes(pdf.size)}
                   </span>
-                  <Button
+                  {!isNative() && <Button
                     variant="outline"
                     onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
                   >
                     <Download />
                     {t("download")}
-                  </Button>
+                  </Button>}
                   <Button
                     variant="outline"
                     onClick={async () => {

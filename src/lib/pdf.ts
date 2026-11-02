@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { PageRecord } from "./db";
 import { loadImageCanvas } from "./imaging";
+import { isNative } from "./native";
 
 export type PdfQuality = "high" | "medium" | "small";
 export type PdfPageSize = "fit" | "a4";
@@ -46,7 +47,8 @@ export async function exportPdf(
     onProgress?.(i + 1, pages.length);
     await new Promise((r) => setTimeout(r, 0));
   }
-  return pdf!.output("blob");
+  if (!pdf) throw new Error("NO_PAGES");
+  return pdf.output("blob");
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
@@ -61,6 +63,7 @@ export function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function canShareFile(blob: Blob, filename: string) {
+  if (isNative()) return true;
   if (typeof navigator === "undefined" || !navigator.canShare) return false;
   try {
     return navigator.canShare({ files: [new File([blob], filename, { type: blob.type })] });
@@ -71,6 +74,10 @@ export function canShareFile(blob: Blob, filename: string) {
 
 /** Returns "shared" | "cancelled". Throws if sharing is unavailable. */
 export async function shareFile(blob: Blob, filename: string) {
+  if (isNative()) {
+    const { savePdfNative, shareFileNative } = await import("./native");
+    return shareFileNative(await savePdfNative(blob, filename), filename);
+  }
   const file = new File([blob], filename, { type: blob.type });
   try {
     await navigator.share({ files: [file], title: filename });
@@ -82,7 +89,7 @@ export async function shareFile(blob: Blob, filename: string) {
 }
 
 export function safeFilename(name: string) {
-  return (name.trim() || "MemoScan").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80) + ".pdf";
+  return (name.trim() || "Waraqah").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80) + ".pdf";
 }
 
 export function formatBytes(n: number) {

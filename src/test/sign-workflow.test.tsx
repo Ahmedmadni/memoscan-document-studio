@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PDFDocument } from "pdf-lib";
 import { I18nProvider } from "@/lib/i18n";
-import { SignPage } from "@/routes/sign";
+import { SigningWorkspace } from "@/components/SigningWorkspace";
 vi.mock("@/components/AppHeader", () => ({ AppHeader: () => null }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: unknown) => options,
@@ -22,7 +22,7 @@ function setup(en = false) {
   if (en) localStorage.setItem("waraqah.lang", "en");
   render(
     <I18nProvider>
-      <SignPage />
+      <SigningWorkspace />
     </I18nProvider>,
   );
 }

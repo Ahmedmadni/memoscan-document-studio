@@ -19,6 +19,8 @@
 - tsconfig has noUncheckedIndexedAccess off because the pixel loops index typed arrays heavily.
 - Signature geometry and PDF export share browser-safe helpers in src/lib/signature.ts using normalized visible crop-box coordinates, including page rotation, so preview and export agree.
 - PDF.js rendering lives in a dynamically imported browser-only module with a Vite-emitted matching worker and abort cleanup, so SSR does not evaluate browser rendering code.
+- Signing UI lives in a reusable component, while route files export only route configuration, so tests do not interfere with route code splitting and hydration.
+- Capacitor selects hash navigation only on native platforms, preserving browser URLs and local WebView navigation.
 
 - Keep home as a lightweight entry point, with independent `/scan`, `/documents`, `/sign` and `/settings` routes; this prevents workflow coupling and keeps local document operations intact.
 - Library filtering and ordering use the browser-safe document-list helper so search and sorting can be regression-tested without altering stored page order.

@@ -11,6 +11,11 @@ on:
       - "package.json"
       - "bun.lock"
       - "vite.config.ts"
+      - "tsconfig.json"
+      - "vitest.config.ts"
+      - "eslint.config.js"
+      - ".prettierrc"
+      - ".prettierignore"
       - "capacitor.config.ts"
       - "android/**"
       - ".github/workflows/android-debug-apk.yml"
@@ -44,28 +49,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Format changed application files
-        run: >-
-          bunx prettier --write
-          src/components/AppHeader.tsx
-          src/components/BottomNav.tsx
-          src/components/ImagePickers.tsx
-          src/components/PageHeading.tsx
-          'src/routes/doc.$id.tsx'
-          src/routes/documents.tsx
-          src/routes/index.tsx
-          src/routes/privacy.tsx
-          src/routes/scan.tsx
-          src/routes/settings.tsx
-          src/routes/sign.tsx
-          src/lib/document-list.ts
-          src/lib/signature-preview.ts
-          src/lib/signature.ts
-          src/lib/i18n.tsx
-          src/styles.css
-          src/test/document-list.test.ts
-          src/test/signature.test.ts
 
       - name: Run tests and lint
         run: |

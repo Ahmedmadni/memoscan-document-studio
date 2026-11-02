@@ -1,5 +1,7 @@
-# Site organization and interface
-- [ ] Separate home, scanning, document library, signing and settings pages.
-- [ ] Refresh the shared interface and Arabic/English layouts; add library search and sorting.
-- [ ] Repair existing preview errors and verify regression tests and browser workflows.
-- [ ] Android APK and GitHub verification remain outside this UI task; require build environment and repository access.
+# Final Waraqah stabilization
+- [x] Preserve separate feature pages, bilingual identity, library search and sorting.
+- [ ] Finish small mobile layout adjustments and verify Arabic/English pages.
+- [ ] Fix reproducible camera, signing and native navigation issues; retain PDF-order tests.
+- [ ] Resolve lint/format failures and run regression/browser checks.
+- [x] Verify GitHub main and latest Android workflow/artifact through public API.
+- [ ] Update Android release notes with verified CI status and remaining physical-device checks.
