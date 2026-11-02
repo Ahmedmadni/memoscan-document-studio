@@ -115,7 +115,9 @@ describe("image decoding safeguards", () => {
       throw new Error("IMAGE_FALLBACK_UNAVAILABLE");
     });
 
-    await expect(loadImageCanvas(new Blob(["image"]))).rejects.toThrow("IMAGE_FALLBACK_UNAVAILABLE");
+    await expect(loadImageCanvas(new Blob(["image"]))).rejects.toThrow(
+      "IMAGE_FALLBACK_UNAVAILABLE",
+    );
     expect(bitmap.close).toHaveBeenCalledOnce();
   });
 });
