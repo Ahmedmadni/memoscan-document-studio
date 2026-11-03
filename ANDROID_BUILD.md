@@ -49,3 +49,33 @@ The workflow `.github/workflows/android-debug-apk.yml` runs the web checks, veri
 A successful CI APK build does not verify a physical device. Install the APK on an Android phone and check camera capture, image import, IndexedDB persistence after force-close/reopen, PDF export, and native share sheet. Do not request broad storage permissions unless a feature demonstrably needs them.
 
 Also check multi-shot camera capture after accepting/cancelling a crop, navigation and Android Back, signature preview/placement, share-sheet cancellation, Arabic/English switching, and offline startup. Native PDF exports are written to application cache and offered to the system share sheet; explicitly save a permanent copy there. Image processing limits output dimensions after decoding; full-resolution decode still depends on device memory. Test large phone photos on a low-memory device before release.
+
+## Latest verified CI result
+
+- Commit `3c9323f37925ba559b3cc0353405c2f4c18865ef`: GitHub Actions run [41618669198](https://github.com/Ahmedmadni/memoscan-document-studio/actions/runs/41618669198) completed successfully (tests, lint, web build, Capacitor sync, Gradle `assembleDebug`).
+- Artifact `waraqah-android-debug-apk` (~5.2 MB) was uploaded, retained 14 days.
+- Local checks for the same code: Prettier clean, typecheck clean, 70/70 Vitest tests passed, ESLint 0 errors (7 existing warnings), production build succeeded.
+- Not yet tested on a physical Android device.
+
+## Physical device test checklist
+
+Download the artifact from the run page, unzip, and install `app-debug.apk` (allow "install unknown apps").
+
+Camera:
+
+1. Open **Scan**, tap camera; accept the camera prompt. Expect the system camera to open.
+2. Take a photo, then take a second one; both pages appear in order.
+3. Cancel the camera once; the app stays on Scan with no error.
+4. Deny the permission; a clear message appears and gallery import still works.
+5. Adjust the four corners by touch, save, and confirm the corrected page.
+6. Force-close the app and reopen; the document is still in **Documents**.
+
+Signature:
+
+1. Open **Sign**, choose a multi-page PDF, select page 2.
+2. Draw a signature with a finger; then try importing a PNG with transparency.
+3. Drag and resize the signature on the preview; rotate the phone and confirm it stays in place.
+4. Export; open the new PDF and confirm the signature sits in the same spot, only on page 2, and the original file is unchanged.
+5. Share the PDF, then cancel the share sheet; the app remains usable.
+
+General: Android Back on each page, Arabic/English switch, airplane-mode start, and a large photo on a low-memory phone.
