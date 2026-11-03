@@ -1,4 +1,5 @@
 # Final Waraqah stabilization
+
 - [x] Preserve separate feature pages, bilingual identity, library search and sorting.
 - [ ] Finish small mobile layout adjustments and verify Arabic/English pages.
 - [ ] Fix reproducible camera, signing and native navigation issues; retain PDF-order tests.
