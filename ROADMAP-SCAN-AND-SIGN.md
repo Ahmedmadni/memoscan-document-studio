@@ -3,6 +3,7 @@
 ## Product direction
 
 Waraqah (ورقة) is one privacy-first document workspace with two equally visible workflows:
+
 1. **Scan documents** — capture/import images, correct pages, organize them and export image-based PDFs.
 2. **Add signature** — a single signing workspace that lets users choose an existing PDF, then draw a new signature or import a ready signature image from the device photo library, place it on any page, and export a signed copy.
 
@@ -52,36 +53,43 @@ The workflows share one document library, common file import/export, local-first
 ## Delivery phases and acceptance criteria
 
 ### Phase 0 — Stabilize current release
+
 - Fix the launcher-icon workflow and formatting/lint failures.
 - Verify tests, lint, web build, Android APK creation, manifest icon references and the generated APK artifact.
 - Do not call an APK release-ready until all CI steps pass; real Android camera verification remains a device-level check.
 
 ### Phase 1 — Shared product shell and library
+
 - Update branding and metadata across home/document/privacy pages.
 - Add exactly two top-level entry points: Scan and Add signature, without removing current scanner capabilities. PDF selection and signature-source selection live inside Add signature.
 - Establish shared document types and safe local storage migration.
 - Acceptance: existing scanner documents remain accessible; scan and sign can be started independently; scanned documents are not automatically routed to signing; both entry points work in Arabic and English; no duplicate libraries.
 
 ### Phase 2 — Signature capture and placement
+
 - Implement draw/clear/recreate signature canvas with touch, stylus and mouse support.
 - Add PDF import, viewer/page navigation, placement overlay, drag/resize, undo and page-boundary constraints.
 - Acceptance: placement stays aligned after zoom/rotation and on small/large screens; blank signatures cannot be exported; an image chosen from the gallery can be previewed, rejected, or placed without forcing a scan workflow.
 
 ### Phase 3 — PDF export and shared handoff
+
 - Embed the visual signature into a copy of the original PDF, preserving all pages, page sizes and orientation.
 - Add filename, progress, save/share, and direct handoff from scanned documents.
 - Acceptance: original file is unchanged; exported PDF opens in independent readers; signature appears on the intended page and location; multi-page PDFs retain every page.
 
 ### Phase 4 — Quality, privacy and accessibility
+
 - Add unit tests for coordinate mapping, placement bounds, file validation and storage migration; integration tests for multi-page export.
 - Test Arabic/English, RTL/LTR, offline behavior, cancellation, low-memory and large PDFs.
 - Review keyboard/screen-reader labels, color contrast, permission prompts, privacy copy and deletion of stored signatures.
 - Acceptance: CI passes and a documented physical Android smoke test covers camera, import, signing, export and share.
 
 ### Phase 5 — Optional advanced signing
+
 - Only after the MVP is stable, assess certificate-based cryptographic signatures, trusted identity, timestamps and audit records. This is a separate security/legal scope, not implied by the visual-signature MVP.
 
 ## Release checklist
+
 - [ ] Current CI is green (tests + lint + web build + Android debug APK).
 - [ ] Native launcher icon is verified inside the generated APK.
 - [ ] Scan workflow and existing local documents are regression-tested.
