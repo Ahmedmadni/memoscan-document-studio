@@ -96,3 +96,5 @@ Additional phone checks for the new build:
 6. Cancel while capture or approval is pending, reopen and confirm no old pages appear. Repeat in Arabic and English, and after backgrounding/resuming.
 
 Obtain the updated APK only from a successful Actions run whose commit contains these changes; an older successful run does not verify this revision. Install and follow the checks above before release.
+
+Checks run for the camera update: 75/75 Vitest tests passed; Prettier check passed; ESLint reported 0 errors and 7 existing warnings. The preview reported build OK. A Chromium synthetic camera test captured two pages without interruption, approved both, added them to Documents and reopened the saved document without runtime errors. This synthetic browser camera does not verify physical camera quality, hardware torch/zoom, native permissions or an Android APK.
