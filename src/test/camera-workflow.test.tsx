@@ -20,6 +20,7 @@ afterEach(() => {
 
 async function openCamera() {
   const stop = vi.fn();
+  const onFiles = vi.fn();
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) },
@@ -32,7 +33,7 @@ async function openCamera() {
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
   render(
     <I18nProvider>
-      <ImagePickers onFiles={vi.fn()} />
+      <ImagePickers onFiles={onFiles} />
     </I18nProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "التقاط بالكاميرا" }));
@@ -41,10 +42,37 @@ async function openCamera() {
   if (!video) throw new Error("Missing camera video");
   Object.defineProperty(video, "videoWidth", { value: 640 });
   Object.defineProperty(video, "videoHeight", { value: 480 });
-  return { video, stop };
+  return { video, stop, onFiles };
 }
 
 describe("camera review lifecycle", () => {
+  it("captures two pages without review interruption and imports only after both approvals", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
+      callback(new Blob(["image"], { type: "image/jpeg" })),
+    );
+    const { video, onFiles, stop } = await openCamera();
+    fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "صفحة 2" })).toBeEnabled());
+    expect(document.querySelector("video")).toBe(video);
+    expect(screen.queryByRole("button", { name: "اعتماد الصفحة" })).toBeNull();
+    expect(onFiles).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (0/2)" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/2)" })).toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" }));
+    expect(onFiles).toHaveBeenCalledTimes(1);
+    expect(onFiles.mock.calls[0][0]).toHaveLength(2);
+    expect(stop).toHaveBeenCalled();
+  });
   it("keeps the same live video when accepting a multi-shot review", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
       callback(new Blob(["image"], { type: "image/jpeg" })),
@@ -52,12 +80,21 @@ describe("camera review lifecycle", () => {
     const { video, stop } = await openCamera();
     const stream = video.srcObject;
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    fireEvent.click(screen.getByRole("button", { name: /^مراجعة وإضافة$/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled(),
+    );
+    expect(screen.queryByRole("button", { name: "اعتماد الصفحة" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "تم اعتماد الصفحة" })).toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "متابعة التصوير" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(document.querySelector("video")).toBe(video);
     expect(video.srcObject).toBe(stream);
     expect(stop).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "مراجعة وإضافة (1)" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled();
   });
 
   it("ignores an encoded capture after the camera is closed", async () => {
