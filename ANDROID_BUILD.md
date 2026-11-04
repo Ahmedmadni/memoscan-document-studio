@@ -79,3 +79,20 @@ Signature:
 5. Share the PDF, then cancel the share sheet; the app remains usable.
 
 General: Android Back on each page, Arabic/English switch, airplane-mode start, and a large photo on a low-memory phone.
+
+## Portrait batch camera update (2026-11-04)
+
+Current source adds a portrait camera, a large circular shutter, consecutive captures without per-shot interruption, and mandatory approval of each page before adding a batch. Startup no longer waits for orientation/status-bar operations; live edge sampling is reduced. Actual startup time depends on permission prompts and hardware and has not been benchmarked on a phone.
+
+The same camera is bundled into Android by the existing workflow. `@capacitor/screen-orientation` locks portrait only while the camera is open. Torch (continuous light), zoom and camera switching depend on the camera/WebView capabilities. Unsupported torch is disabled; unsupported zoom is omitted. No broad storage permission is added. No APK build or physical-device verification for these changes is claimed.
+
+Additional phone checks for the new build:
+
+1. Open Scan and the camera with permissions granted, then with permission denied. Check the device-camera fallback and gallery import.
+2. Confirm portrait while capturing; close the camera and confirm other pages can rotate normally.
+3. Capture three pages consecutively: live preview must remain open after each shot. Open Review, adjust corners, approve each page, and confirm Add is disabled until every remaining page is approved.
+4. Navigate between previews, delete one, resume shooting and add another. Approve remaining pages; verify their order in Documents and exported PDF after reopening the app.
+5. Test torch on/off and zoom on a device that exposes them; switch front/back and confirm unsupported controls reset. Close the camera and check that its light and privacy indicator turn off.
+6. Cancel while capture or approval is pending, reopen and confirm no old pages appear. Repeat in Arabic and English, and after backgrounding/resuming.
+
+Obtain the updated APK only from a successful Actions run whose commit contains these changes; an older successful run does not verify this revision. Install and follow the checks above before release.

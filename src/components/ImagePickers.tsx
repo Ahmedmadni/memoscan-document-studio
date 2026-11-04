@@ -446,6 +446,11 @@ export function ImagePickers({
                       setReviewCorners(
                         (old) => old.map((p, i) => (i === activeCorner ? { x, y } : p)) as Corners,
                       );
+                      setApproved((old) => {
+                        const next = new Set(old);
+                        next.delete(reviewFile);
+                        return next;
+                      });
                     }}
                     onPointerUp={() => setActiveCorner(null)}
                     onPointerCancel={() => setActiveCorner(null)}
