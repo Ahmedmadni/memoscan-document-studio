@@ -61,9 +61,13 @@ describe("camera review lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
     expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (0/2)" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/2)" })).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/2)" })).toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" }));
     expect(onFiles).toHaveBeenCalledTimes(1);
     expect(onFiles.mock.calls[0][0]).toHaveLength(2);
