@@ -52,12 +52,17 @@ describe("camera review lifecycle", () => {
     const { video, stop } = await openCamera();
     const stream = video.srcObject;
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    fireEvent.click(screen.getByRole("button", { name: /^مراجعة وإضافة$/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled());
+    expect(screen.queryByRole("button", { name: "اعتماد الصفحة" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "تم اعتماد الصفحة" })).toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: "متابعة التصوير" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(document.querySelector("video")).toBe(video);
     expect(video.srcObject).toBe(stream);
     expect(stop).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "مراجعة وإضافة (1)" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled();
   });
 
   it("ignores an encoded capture after the camera is closed", async () => {
