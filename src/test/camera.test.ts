@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { batchApproved, cameraControls, portraitCamera, releaseCameraOrientation, setCameraControl } from "@/lib/camera";
+import {
+  batchApproved,
+  cameraControls,
+  portraitCamera,
+  releaseCameraOrientation,
+  setCameraControl,
+} from "@/lib/camera";
 
 const mocks = vi.hoisted(() => ({ native: false, lock: vi.fn(), unlock: vi.fn() }));
 vi.mock("@capacitor/core", () => ({ Capacitor: { isNativePlatform: () => mocks.native } }));
-vi.mock("@capacitor/screen-orientation", () => ({ ScreenOrientation: { lock: mocks.lock, unlock: mocks.unlock } }));
+vi.mock("@capacitor/screen-orientation", () => ({
+  ScreenOrientation: { lock: mocks.lock, unlock: mocks.unlock },
+}));
 
 describe("camera rules", () => {
   it("requires every captured page to be approved before importing the batch", () => {
@@ -15,11 +23,18 @@ describe("camera rules", () => {
   });
   it("does not expose unsupported torch or zoom", () => {
     expect(cameraControls({} as MediaStreamTrack)).toEqual({ torch: false, zoom: null });
-    expect(cameraControls({ getCapabilities: () => ({ torch: false, zoom: { min: 1, max: 1 } }) } as unknown as MediaStreamTrack)).toEqual({ torch: false, zoom: null });
+    expect(
+      cameraControls({
+        getCapabilities: () => ({ torch: false, zoom: { min: 1, max: 1 } }),
+      } as unknown as MediaStreamTrack),
+    ).toEqual({ torch: false, zoom: null });
   });
   it("applies supported light and zoom settings to the active track", async () => {
     const applyConstraints = vi.fn().mockResolvedValue(undefined);
-    const track = { getCapabilities: () => ({ torch: true, zoom: { min: 1, max: 4, step: 0.1 } }), applyConstraints } as unknown as MediaStreamTrack;
+    const track = {
+      getCapabilities: () => ({ torch: true, zoom: { min: 1, max: 4, step: 0.1 } }),
+      applyConstraints,
+    } as unknown as MediaStreamTrack;
     expect(cameraControls(track)).toEqual({ torch: true, zoom: { min: 1, max: 4, step: 0.1 } });
     await setCameraControl(track, "torch", true);
     await setCameraControl(track, "zoom", 2);

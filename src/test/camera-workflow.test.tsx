@@ -52,11 +52,15 @@ describe("camera review lifecycle", () => {
     const { video, stop } = await openCamera();
     const stream = video.srcObject;
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled(),
+    );
     expect(screen.queryByRole("button", { name: "اعتماد الصفحة" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
     fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "تم اعتماد الصفحة" })).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "تم اعتماد الصفحة" })).toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "متابعة التصوير" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(document.querySelector("video")).toBe(video);
