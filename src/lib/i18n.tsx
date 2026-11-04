@@ -36,10 +36,16 @@ const dict = {
   resumeCapture: { ar: "متابعة التصوير", en: "Continue capturing" },
   torchOn: { ar: "تشغيل الفلاش", en: "Turn light on" },
   torchOff: { ar: "إيقاف الفلاش", en: "Turn light off" },
-  torchUnavailable: { ar: "الفلاش غير مدعوم لهذه الكاميرا", en: "Light is not supported by this camera" },
+  torchUnavailable: {
+    ar: "الفلاش غير مدعوم لهذه الكاميرا",
+    en: "Light is not supported by this camera",
+  },
   switchCamera: { ar: "تبديل الكاميرا", en: "Switch camera" },
   cameraZoom: { ar: "التقريب", en: "Zoom" },
-  cameraControlFailed: { ar: "تعذر تغيير إعداد الكاميرا على هذا الجهاز.", en: "Couldn’t change this camera setting on your device." },
+  cameraControlFailed: {
+    ar: "تعذر تغيير إعداد الكاميرا على هذا الجهاز.",
+    en: "Couldn’t change this camera setting on your device.",
+  },
   systemCamera: { ar: "استخدام كاميرا الجهاز", en: "Use device camera" },
   singleShot: { ar: "فردي", en: "Single" },
   multiShot: { ar: "متسلسل", en: "Batch" },

@@ -10,12 +10,18 @@ export function cameraControls(track: MediaStreamTrack) {
   const zoom = caps?.zoom;
   return {
     torch: caps?.torch === true,
-    zoom: zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min
-      ? zoom : null,
+    zoom:
+      zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min
+        ? zoom
+        : null,
   };
 }
 
-export async function setCameraControl(track: MediaStreamTrack, key: "torch" | "zoom", value: boolean | number) {
+export async function setCameraControl(
+  track: MediaStreamTrack,
+  key: "torch" | "zoom",
+  value: boolean | number,
+) {
   await track.applyConstraints({ advanced: [{ [key]: value } as MediaTrackConstraintSet] });
 }
 
