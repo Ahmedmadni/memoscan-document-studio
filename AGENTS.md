@@ -24,3 +24,4 @@
 
 - Keep home as a lightweight entry point, with independent `/scan`, `/documents`, `/sign` and `/settings` routes; this prevents workflow coupling and keeps local document operations intact.
 - Library filtering and ordering use the browser-safe document-list helper so search and sorting can be regression-tested without altering stored page order.
+- Camera uses one persistent WebView stream with capability-gated controls and an explicit per-page approval queue; native portrait locking uses Capacitor and releases on close so other workflows retain their orientation.
