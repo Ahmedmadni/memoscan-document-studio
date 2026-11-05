@@ -179,7 +179,9 @@ export function PageEditor({
         </Button>
         <div className="flex rounded-lg bg-muted p-1">
           {(["corners", "adjust"] as const).map((k) => (
-            <Button variant="ghost" size="sm"
+            <Button
+              variant="ghost"
+              size="sm"
               key={k}
               className="chip border-0"
               aria-pressed={tab === k}
@@ -232,7 +234,9 @@ export function PageEditor({
               />
             </svg>
             {s.corners.map((p, i) => (
-              <Button variant="ghost" size="icon"
+              <Button
+                variant="ghost"
+                size="icon"
                 key={i}
                 aria-label={`corner ${i + 1}`}
                 className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-handle bg-handle/30 focus-visible:ring-4 focus-visible:ring-ring"
@@ -293,7 +297,9 @@ export function PageEditor({
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               {FILTERS.map(([f, k]) => (
-                <Button variant="outline" size="sm"
+                <Button
+                  variant="outline"
+                  size="sm"
                   key={f}
                   className="chip"
                   aria-pressed={s.filter === f}
@@ -322,8 +328,11 @@ export function PageEditor({
             <div className="space-y-1 sm:col-span-2">
               <label className="flex items-center justify-between gap-3 text-sm">
                 {t("curvedEdges")}
-                <Switch aria-label={t("curvedEdges")} checked={s.curvedEdges ?? false}
-                  onCheckedChange={(checked) => update({ curvedEdges: checked }, "curvedEdges")} />
+                <Switch
+                  aria-label={t("curvedEdges")}
+                  checked={s.curvedEdges ?? false}
+                  onCheckedChange={(checked) => update({ curvedEdges: checked }, "curvedEdges")}
+                />
               </label>
               <p className="text-xs text-muted-foreground">{t("curvedEdgesLimit")}</p>
             </div>

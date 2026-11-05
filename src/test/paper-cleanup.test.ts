@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyAdjustments, defaultSettings, straightenCurvedPaper, whitenPaper } from "@/lib/imaging";
+import {
+  applyAdjustments,
+  defaultSettings,
+  straightenCurvedPaper,
+  whitenPaper,
+} from "@/lib/imaging";
 
 function image(w: number, h: number, pixel: (x: number, y: number) => number[]) {
   const data = new Uint8ClampedArray(w * h * 4);
@@ -43,7 +48,9 @@ describe("local paper cleanup", () => {
     const before = dark.data.slice();
     expect(straightenCurvedPaper(dark)).toBe(false);
     expect(dark.data).toEqual(before);
-    const text = image(100, 100, (x, y) => y === 50 && x < 12 ? [10, 10, 10, 255] : [240, 240, 240, 255]);
+    const text = image(100, 100, (x, y) =>
+      y === 50 && x < 12 ? [10, 10, 10, 255] : [240, 240, 240, 255],
+    );
     const original = text.data.slice();
     expect(straightenCurvedPaper(text)).toBe(false);
     expect(text.data).toEqual(original);

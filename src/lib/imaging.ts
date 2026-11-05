@@ -394,14 +394,20 @@ export function whitenPaper(img: ImageData) {
   }
   for (let y = 0; y < h; y++) {
     const gy = Math.max(0, Math.min(rows - 1, y / tile - 0.5));
-    const y0 = Math.floor(gy), y1 = Math.min(rows - 1, y0 + 1), fy = gy - y0;
+    const y0 = Math.floor(gy),
+      y1 = Math.min(rows - 1, y0 + 1),
+      fy = gy - y0;
     for (let x = 0; x < w; x++) {
       const gx = Math.max(0, Math.min(cols - 1, x / tile - 0.5));
-      const x0 = Math.floor(gx), x1 = Math.min(cols - 1, x0 + 1), fx = gx - x0;
+      const x0 = Math.floor(gx),
+        x1 = Math.min(cols - 1, x0 + 1),
+        fx = gx - x0;
       const i = (y * w + x) * 4;
       for (let c = 0; c < 3; c++) {
-        const top = paper[(y0 * cols + x0) * 3 + c] * (1 - fx) + paper[(y0 * cols + x1) * 3 + c] * fx;
-        const bottom = paper[(y1 * cols + x0) * 3 + c] * (1 - fx) + paper[(y1 * cols + x1) * 3 + c] * fx;
+        const top =
+          paper[(y0 * cols + x0) * 3 + c] * (1 - fx) + paper[(y0 * cols + x1) * 3 + c] * fx;
+        const bottom =
+          paper[(y1 * cols + x0) * 3 + c] * (1 - fx) + paper[(y1 * cols + x1) * 3 + c] * fx;
         const reference = top * (1 - fy) + bottom * fy;
         const ratio = data[i + c] / reference;
         // Continuous white-point curve: paper becomes white, low-contrast strokes remain.
@@ -431,18 +437,24 @@ export function straightenCurvedPaper(img: ImageData): boolean {
       samples++;
     }
   }
-  let acc = 0, white = 255;
+  let acc = 0,
+    white = 255;
   for (let v = 0; v < 256; v++) {
     acc += hist[v];
-    if (acc >= samples * 0.8) { white = v; break; }
+    if (acc >= samples * 0.8) {
+      white = v;
+      break;
+    }
   }
   if (white < 160) return false;
   const limit = Math.floor(w * 0.14);
   const threshold = white * 0.65;
-  const left = new Float32Array(h), right = new Float32Array(h);
+  const left = new Float32Array(h),
+    right = new Float32Array(h);
   let confident = 0;
   for (let y = 0; y < h; y++) {
-    let l = 0, r = w - 1;
+    let l = 0,
+      r = w - 1;
     while (l < limit && luminance(l, y) < threshold) l++;
     while (r > w - 1 - limit && luminance(r, y) < threshold) r--;
     // Small edge marks are not contours; stop if background exceeds the safety band.
@@ -458,17 +470,22 @@ export function straightenCurvedPaper(img: ImageData): boolean {
   const src = new Uint8ClampedArray(data);
   const radius = Math.max(1, Math.round(h / 200));
   for (let y = 0; y < h; y++) {
-    let l = 0, r = w - 1;
+    let l = 0,
+      r = w - 1;
     for (let row = Math.max(0, y - radius); row <= Math.min(h - 1, y + radius); row++) {
-      l = Math.max(l, left[row]); r = Math.min(r, right[row]);
+      l = Math.max(l, left[row]);
+      r = Math.min(r, right[row]);
     }
     if (l > 0) l++;
     if (r < w - 1) r--;
     for (let x = 0; x < w; x++) {
       const sx = l + (x / (w - 1)) * (r - l);
-      const x0 = Math.floor(sx), x1 = Math.min(w - 1, x0 + 1), f = sx - x0;
+      const x0 = Math.floor(sx),
+        x1 = Math.min(w - 1, x0 + 1),
+        f = sx - x0;
       const i = (y * w + x) * 4;
-      for (let c = 0; c < 4; c++) data[i + c] = src[(y * w + x0) * 4 + c] * (1 - f) + src[(y * w + x1) * 4 + c] * f;
+      for (let c = 0; c < 4; c++)
+        data[i + c] = src[(y * w + x0) * 4 + c] * (1 - f) + src[(y * w + x1) * 4 + c] * f;
     }
   }
   return true;

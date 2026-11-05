@@ -713,7 +713,10 @@ export function ImagePickers({
                   >
                     <Images className="size-7" />
                     {captured.length > 0 && (
-                      <span className="absolute -end-1 -top-1 grid min-w-6 place-items-center rounded-full bg-primary px-1 text-xs leading-6 text-primary-foreground" aria-hidden="true">
+                      <span
+                        className="absolute -end-1 -top-1 grid min-w-6 place-items-center rounded-full bg-primary px-1 text-xs leading-6 text-primary-foreground"
+                        aria-hidden="true"
+                      >
                         {captured.length}
                       </span>
                     )}
@@ -740,12 +743,22 @@ export function ImagePickers({
               <PageEditor
                 key={reviewFile.name}
                 page={{
-                  id: reviewFile.name, docId: "camera-review", original: reviewFile,
-                  processed: reviewFile, thumb: "", width: reviewImageSize.width,
-                  height: reviewImageSize.height, createdAt: reviewFile.lastModified,
+                  id: reviewFile.name,
+                  docId: "camera-review",
+                  original: reviewFile,
+                  processed: reviewFile,
+                  thumb: "",
+                  width: reviewImageSize.width,
+                  height: reviewImageSize.height,
+                  createdAt: reviewFile.lastModified,
                   autoDetected: false,
-                  settings: { ...defaultSettings(reviewCorners), filter: "original", sharpen: 0,
-                    ...reviewSettings.get(reviewFile), corners: reviewCorners },
+                  settings: {
+                    ...defaultSettings(reviewCorners),
+                    filter: "original",
+                    sharpen: 0,
+                    ...reviewSettings.get(reviewFile),
+                    corners: reviewCorners,
+                  },
                 }}
                 onSave={async (settings) => {
                   setReviewSettings((old) => new Map(old).set(reviewFile, settings));

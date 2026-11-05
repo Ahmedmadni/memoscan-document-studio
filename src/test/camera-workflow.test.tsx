@@ -118,7 +118,9 @@ describe("camera review lifecycle", () => {
     );
     const { onFiles } = await openCamera();
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
     fireEvent.click(screen.getByRole("button", { name: "تحرير" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "حفظ" })).toBeEnabled());
@@ -128,11 +130,18 @@ describe("camera review lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "حفظ" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "حفظ" })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" })).toBeEnabled(),
+    );
     const { processPage } = await import("@/lib/imaging");
-    expect(processPage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      filter: "paper", curvedEdges: true,
-    }), 2400);
+    expect(processPage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        filter: "paper",
+        curvedEdges: true,
+      }),
+      2400,
+    );
     fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" }));
     expect(onFiles).toHaveBeenCalledOnce();
     expect(onFiles.mock.calls[0][0]).toHaveLength(1);
