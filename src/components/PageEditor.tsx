@@ -2,6 +2,7 @@ import { Loader2, Redo2, RotateCcw, RotateCw, Undo2, Wand2, X } from "lucide-rea
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import type { PageRecord } from "@/lib/db";
 import { useI18n, type TKey } from "@/lib/i18n";
 import {
@@ -24,6 +25,8 @@ const FILTERS: [FilterMode, TKey][] = [
   ["gray", "fGray"],
   ["bw", "fBw"],
   ["clean", "fClean"],
+  ["paper", "fPaper"],
+  ["text", "fText"],
 ];
 
 export function PageEditor({
@@ -91,11 +94,12 @@ export function PageEditor({
     }));
   }
   const undo = () =>
-    setHist((h) =>
-      h.past.length
-        ? { past: h.past.slice(0, -1), present: h.past.at(-1)!, future: [h.present, ...h.future] }
-        : h,
-    );
+    setHist((h) => {
+      const previous = h.past.at(-1);
+      return previous
+        ? { past: h.past.slice(0, -1), present: previous, future: [h.present, ...h.future] }
+        : h;
+    });
   const redo = () =>
     setHist((h) =>
       h.future.length
@@ -105,7 +109,8 @@ export function PageEditor({
 
   const box = useRef<HTMLDivElement>(null);
   function drag(i: number, e: React.PointerEvent) {
-    const r = box.current!.getBoundingClientRect();
+    if (!box.current) return;
+    const r = box.current.getBoundingClientRect();
     const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     const c = s.corners.map((p) => ({ ...p })) as Corners;
@@ -174,14 +179,14 @@ export function PageEditor({
         </Button>
         <div className="flex rounded-lg bg-muted p-1">
           {(["corners", "adjust"] as const).map((k) => (
-            <button
+            <Button variant="ghost" size="sm"
               key={k}
               className="chip border-0"
               aria-pressed={tab === k}
               onClick={() => setTab(k)}
             >
               {t(k)}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="ms-auto flex gap-1">
@@ -227,7 +232,7 @@ export function PageEditor({
               />
             </svg>
             {s.corners.map((p, i) => (
-              <button
+              <Button variant="ghost" size="icon"
                 key={i}
                 aria-label={`corner ${i + 1}`}
                 className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-handle bg-handle/30 focus-visible:ring-4 focus-visible:ring-ring"
@@ -288,14 +293,14 @@ export function PageEditor({
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               {FILTERS.map(([f, k]) => (
-                <button
+                <Button variant="outline" size="sm"
                   key={f}
                   className="chip"
                   aria-pressed={s.filter === f}
                   onClick={() => update({ filter: f }, "f" + Date.now())}
                 >
                   {t(k)}
-                </button>
+                </Button>
               ))}
               <Button
                 variant="outline"
@@ -314,10 +319,18 @@ export function PageEditor({
                 <RotateCw />
               </Button>
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <label className="flex items-center justify-between gap-3 text-sm">
+                {t("curvedEdges")}
+                <Switch aria-label={t("curvedEdges")} checked={s.curvedEdges ?? false}
+                  onCheckedChange={(checked) => update({ curvedEdges: checked }, "curvedEdges")} />
+              </label>
+              <p className="text-xs text-muted-foreground">{t("curvedEdgesLimit")}</p>
+            </div>
             {slider("angle", "deskew", -15, 15, 0.5)}
             {slider("brightness", "brightness", -100, 100)}
             {slider("contrast", "contrast", -100, 100)}
-            {s.filter === "bw"
+            {s.filter === "bw" || s.filter === "text"
               ? slider("threshold", "threshold", 0, 30)
               : slider("sharpen", "sharpen", 0, 100)}
             <label className="block text-sm sm:col-span-2">

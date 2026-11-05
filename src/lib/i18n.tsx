@@ -230,6 +230,13 @@ const dict = {
   fGray: { ar: "رمادي", en: "Grayscale" },
   fBw: { ar: "أبيض وأسود", en: "Black & white" },
   fClean: { ar: "تنظيف ظلال الورق", en: "Paper shadow cleanup" },
+  fPaper: { ar: "تبييض الورقة", en: "White paper" },
+  fText: { ar: "نص واضح", en: "Clear text" },
+  curvedEdges: { ar: "تسوية حواف الورق المموج", en: "Straighten curved paper edges" },
+  curvedEdgesLimit: {
+    ar: "للتموج الخفيف على خلفية داكنة؛ الطيات الشديدة أو النص المخفي قد تحتاج إعادة التصوير.",
+    en: "For mild curl on a dark background; severe folds or hidden writing may need a new photo.",
+  },
   brightness: { ar: "السطوع", en: "Brightness" },
   contrast: { ar: "التباين", en: "Contrast" },
   sharpen: { ar: "الحدة", en: "Sharpen" },
