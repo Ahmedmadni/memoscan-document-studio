@@ -9,6 +9,7 @@ vi.mock("@/lib/imaging", async (importOriginal) => {
     ...actual,
     loadImageCanvas: vi.fn(async () => document.createElement("canvas")),
     warpPerspective: vi.fn(() => document.createElement("canvas")),
+    processPage: vi.fn(() => document.createElement("canvas")),
   };
 });
 
@@ -54,7 +55,7 @@ describe("camera review lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "صفحة 2" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(document.querySelector("video")).toBe(video);
     expect(screen.queryByRole("button", { name: "اعتماد الصفحة" })).toBeNull();
     expect(onFiles).not.toHaveBeenCalled();
@@ -109,5 +110,31 @@ describe("camera review lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "التقاط بالكاميرا" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
     expect(screen.queryByRole("img", { name: "صفحة" })).toBeNull();
+  });
+
+  it("edits a captured page before approval and keeps that edit when approving the batch", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
+      callback(new Blob(["image"], { type: "image/jpeg" })),
+    );
+    const { onFiles } = await openCamera();
+    fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    fireEvent.click(screen.getByRole("button", { name: "تحرير" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "حفظ" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "التحسين" }));
+    fireEvent.click(screen.getByRole("button", { name: "تبييض الورقة" }));
+    fireEvent.click(screen.getByRole("switch", { name: "تسوية حواف الورق المموج" }));
+    fireEvent.click(screen.getByRole("button", { name: "حفظ" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "حفظ" })).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" })).toBeEnabled());
+    const { processPage } = await import("@/lib/imaging");
+    expect(processPage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      filter: "paper", curvedEdges: true,
+    }), 2400);
+    fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" }));
+    expect(onFiles).toHaveBeenCalledOnce();
+    expect(onFiles.mock.calls[0][0]).toHaveLength(1);
   });
 });
