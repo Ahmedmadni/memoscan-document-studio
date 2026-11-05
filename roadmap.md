@@ -13,3 +13,9 @@
 - [x] Add supported torch, zoom and camera switching; remove startup waits and add native portrait lock.
 - [x] Run camera regressions and browser flow; update Android device checks without claiming device verification.
 - [ ] Verify a new Android APK containing these changes (blocked: pending GitHub sync/Actions run; no local SDK).
+
+## Paper cleanup and compact capture review
+
+- [ ] Add local paper whitening, text clarity and conservative curved-edge background cleanup with regression tests.
+- [ ] Replace live camera thumbnail strip with a counted review icon; preserve per-page editing and approval.
+- [ ] Verify processing and batch review in tests and the mobile browser; state dewarping and Android limitations honestly.
