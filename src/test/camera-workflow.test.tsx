@@ -27,6 +27,7 @@ async function openCamera() {
     value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) },
   });
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,dGVzdA==");
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D);

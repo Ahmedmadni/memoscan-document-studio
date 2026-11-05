@@ -16,6 +16,6 @@
 
 ## Paper cleanup and compact capture review
 
-- [ ] Add local paper whitening, text clarity and conservative curved-edge background cleanup with regression tests.
-- [ ] Replace live camera thumbnail strip with a counted review icon; preserve per-page editing and approval.
-- [ ] Verify processing and batch review in tests and the mobile browser; state dewarping and Android limitations honestly.
+- [x] Add local paper whitening, text clarity and conservative curved-edge background cleanup with regression tests.
+- [x] Replace live camera thumbnail strip with a counted review icon; preserve per-page editing and approval.
+- [x] Verify processing and batch review in tests and the mobile browser; state dewarping and Android limitations honestly.
