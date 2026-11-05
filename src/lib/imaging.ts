@@ -4,7 +4,7 @@
 export type Pt = { x: number; y: number };
 /** Normalized (0..1) corners in order: top-left, top-right, bottom-right, bottom-left. */
 export type Corners = [Pt, Pt, Pt, Pt];
-export type FilterMode = "original" | "enhance" | "gray" | "bw" | "clean";
+export type FilterMode = "original" | "enhance" | "gray" | "bw" | "clean" | "paper" | "text";
 export type Rotation = 0 | 90 | 180 | 270;
 
 export interface EditSettings {
@@ -17,6 +17,8 @@ export interface EditSettings {
   contrast: number; // -100..100
   sharpen: number; // 0..100
   threshold: number; // 0..30, adaptive threshold offset for B/W
+  /** Opt-in horizontal correction of visible curved side edges on light paper. */
+  curvedEdges?: boolean;
 }
 
 export const FULL_CORNERS: Corners = [
@@ -36,6 +38,7 @@ export function defaultSettings(corners: Corners = FULL_CORNERS): EditSettings {
     contrast: 0,
     sharpen: 20,
     threshold: 10,
+    curvedEdges: false,
   };
 }
 
@@ -354,6 +357,140 @@ export function flattenPaperLighting(img: ImageData) {
   }
 }
 
+/** Normalize each channel against a local bright-paper estimate, preserving coloured ink.
+ * A coarse percentile grid keeps memory bounded independently of image resolution.
+ */
+export function whitenPaper(img: ImageData) {
+  const { width: w, height: h, data } = img;
+  if (!w || !h) return;
+  const tile = Math.max(16, Math.round(Math.max(w, h) / 24));
+  const cols = Math.ceil(w / tile);
+  const rows = Math.ceil(h / tile);
+  const paper = new Float32Array(cols * rows * 3);
+  for (let ty = 0; ty < rows; ty++) {
+    for (let tx = 0; tx < cols; tx++) {
+      const hist = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+      let count = 0;
+      for (let y = ty * tile; y < Math.min(h, (ty + 1) * tile); y += 2) {
+        for (let x = tx * tile; x < Math.min(w, (tx + 1) * tile); x += 2) {
+          const i = (y * w + x) * 4;
+          for (let c = 0; c < 3; c++) hist[c][data[i + c]]++;
+          count++;
+        }
+      }
+      for (let c = 0; c < 3; c++) {
+        let acc = 0;
+        let value = 255;
+        for (let v = 0; v < 256; v++) {
+          acc += hist[c][v];
+          if (acc >= count * 0.85) {
+            value = v;
+            break;
+          }
+        }
+        paper[(ty * cols + tx) * 3 + c] = Math.max(100, value);
+      }
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    const gy = Math.max(0, Math.min(rows - 1, y / tile - 0.5));
+    const y0 = Math.floor(gy),
+      y1 = Math.min(rows - 1, y0 + 1),
+      fy = gy - y0;
+    for (let x = 0; x < w; x++) {
+      const gx = Math.max(0, Math.min(cols - 1, x / tile - 0.5));
+      const x0 = Math.floor(gx),
+        x1 = Math.min(cols - 1, x0 + 1),
+        fx = gx - x0;
+      const i = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const top =
+          paper[(y0 * cols + x0) * 3 + c] * (1 - fx) + paper[(y0 * cols + x1) * 3 + c] * fx;
+        const bottom =
+          paper[(y1 * cols + x0) * 3 + c] * (1 - fx) + paper[(y1 * cols + x1) * 3 + c] * fx;
+        const reference = top * (1 - fy) + bottom * fy;
+        const ratio = data[i + c] / reference;
+        // Continuous white-point curve: paper becomes white, low-contrast strokes remain.
+        data[i + c] = 255 * Math.min(1, Math.max(0, (ratio - 0.04) / 0.92));
+      }
+    }
+  }
+}
+
+/** Rectify mild side-edge curl by mapping each row's visible paper span to a rectangle.
+ * Only light sheets with broad, dark side-background runs qualify. This is not 3D
+ * book dewarping: hidden writing and severely bent text cannot be reconstructed.
+ * No confident contour means no change, protecting photos and dark documents.
+ */
+export function straightenCurvedPaper(img: ImageData): boolean {
+  const { width: w, height: h, data } = img;
+  if (w < 40 || h < 40) return false;
+  const luminance = (x: number, y: number) => {
+    const i = (y * w + x) * 4;
+    return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  };
+  const hist = new Uint32Array(256);
+  let samples = 0;
+  for (let y = 0; y < h; y += 4) {
+    for (let x = Math.round(w * 0.2); x < w * 0.8; x += 4) {
+      hist[Math.round(luminance(x, y))]++;
+      samples++;
+    }
+  }
+  let acc = 0,
+    white = 255;
+  for (let v = 0; v < 256; v++) {
+    acc += hist[v];
+    if (acc >= samples * 0.8) {
+      white = v;
+      break;
+    }
+  }
+  if (white < 160) return false;
+  const limit = Math.floor(w * 0.14);
+  const threshold = white * 0.65;
+  const left = new Float32Array(h),
+    right = new Float32Array(h);
+  let confident = 0;
+  for (let y = 0; y < h; y++) {
+    let l = 0,
+      r = w - 1;
+    while (l < limit && luminance(l, y) < threshold) l++;
+    while (r > w - 1 - limit && luminance(r, y) < threshold) r--;
+    // Small edge marks are not contours; stop if background exceeds the safety band.
+    if (l < Math.max(3, w * 0.008) || l >= limit) l = 0;
+    if (w - 1 - r < Math.max(3, w * 0.008) || r <= w - 1 - limit) r = w - 1;
+    left[y] = l;
+    right[y] = r;
+    if (l > 0 || r < w - 1) confident++;
+  }
+  if (confident < h * 0.6) return false;
+  // Conservative moving envelope removes all identified background, including a
+  // narrow safety pixel at the edge, without allowing isolated marks to propagate.
+  const src = new Uint8ClampedArray(data);
+  const radius = Math.max(1, Math.round(h / 200));
+  for (let y = 0; y < h; y++) {
+    let l = 0,
+      r = w - 1;
+    for (let row = Math.max(0, y - radius); row <= Math.min(h - 1, y + radius); row++) {
+      l = Math.max(l, left[row]);
+      r = Math.min(r, right[row]);
+    }
+    if (l > 0) l++;
+    if (r < w - 1) r--;
+    for (let x = 0; x < w; x++) {
+      const sx = l + (x / (w - 1)) * (r - l);
+      const x0 = Math.floor(sx),
+        x1 = Math.min(w - 1, x0 + 1),
+        f = sx - x0;
+      const i = (y * w + x) * 4;
+      for (let c = 0; c < 4; c++)
+        data[i + c] = src[(y * w + x0) * 4 + c] * (1 - f) + src[(y * w + x1) * 4 + c] * f;
+    }
+  }
+  return true;
+}
+
 function sharpen(img: ImageData, amount: number) {
   const { width: w, height: h, data: d } = img;
   const src = new Uint8ClampedArray(d);
@@ -411,8 +548,9 @@ function adaptiveThreshold(img: ImageData, offset: number) {
 export function applyAdjustments(img: ImageData, s: EditSettings) {
   const d = img.data;
   if (s.filter === "clean") flattenPaperLighting(img);
+  if (s.filter === "paper" || s.filter === "text") whitenPaper(img);
   if (s.filter === "enhance") autoLevels(d);
-  if (s.filter === "gray" || s.filter === "bw") toGray(d);
+  if (s.filter === "gray" || s.filter === "bw" || s.filter === "text") toGray(d);
   if (s.brightness !== 0 || s.contrast !== 0) {
     const lut = buildLut(s.brightness, s.contrast);
     for (let i = 0; i < d.length; i += 4) {
@@ -421,7 +559,7 @@ export function applyAdjustments(img: ImageData, s: EditSettings) {
       d[i + 2] = lut[d[i + 2]];
     }
   }
-  if (s.filter === "bw") adaptiveThreshold(img, s.threshold);
+  if (s.filter === "bw" || s.filter === "text") adaptiveThreshold(img, s.threshold);
   else if (s.sharpen > 0) sharpen(img, s.sharpen);
 }
 
@@ -436,6 +574,7 @@ export function processPage(
   // Remove only small, dark regions connected to the rectified page boundary.
   const warpedContext = ctx2d(warped);
   const warpedPixels = warpedContext.getImageData(0, 0, warped.width, warped.height);
+  if (s.curvedEdges && !opts.skipAdjust) straightenCurvedPaper(warpedPixels);
   whitenBorderArtifacts(warpedPixels);
   warpedContext.putImageData(warpedPixels, 0, 0);
   const rotated = rotateCanvas(warped, s.rotation + s.angle);

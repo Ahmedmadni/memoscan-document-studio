@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Images,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   detectDocument,
@@ -17,10 +19,14 @@ import {
   isConvexQuad,
   loadImageCanvas,
   warpPerspective,
+  processPage,
+  defaultSettings,
+  type EditSettings,
   type Corners,
 } from "@/lib/imaging";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PageEditor } from "@/components/PageEditor";
 import { useI18n } from "@/lib/i18n";
 import {
   batchApproved,
@@ -65,6 +71,8 @@ export function ImagePickers({
   const [captureMode, setCaptureMode] = useState<"single" | "multi">("multi");
   const [liveCorners, setLiveCorners] = useState<Corners | null>(null);
   const [reviewFile, setReviewFile] = useState<File | null>(null);
+  const [editingReview, setEditingReview] = useState(false);
+  const [reviewSettings, setReviewSettings] = useState<Map<File, EditSettings>>(new Map());
   const [reviewCorners, setReviewCorners] = useState<Corners>(FULL_CORNERS);
   const [activeCorner, setActiveCorner] = useState<number | null>(null);
   const [reviewImageSize, setReviewImageSize] = useState({ width: 0, height: 0 });
@@ -78,13 +86,6 @@ export function ImagePickers({
     },
     [reviewUrl],
   );
-  const previews = useMemo(
-    () => captured.map((file) => ({ file, url: URL.createObjectURL(file) })),
-    [captured],
-  );
-
-  useEffect(() => () => previews.forEach(({ url }) => URL.revokeObjectURL(url)), [previews]);
-
   useEffect(() => {
     if (!cameraOpen) {
       stream.current?.getTracks().forEach((track) => track.stop());
@@ -179,7 +180,7 @@ export function ImagePickers({
 
   const beginReview = (file: File) => {
     setReviewFile(file);
-    setReviewCorners(FULL_CORNERS);
+    setReviewCorners(reviewSettings.get(file)?.corners ?? FULL_CORNERS);
     setReviewImageSize({ width: 0, height: 0 });
     setCameraError("");
     setActiveCorner(null);
@@ -200,6 +201,8 @@ export function ImagePickers({
     setControlError("");
     setCameraError("");
     setReviewFile(null);
+    setEditingReview(false);
+    setReviewSettings(new Map());
     setActiveCorner(null);
   };
 
@@ -254,7 +257,10 @@ export function ImagePickers({
     setReviewBusy(true);
     try {
       const source = await loadImageCanvas(reviewFile, 3000);
-      const cropped = warpPerspective(source, reviewCorners, 3000);
+      const settings = reviewSettings.get(reviewFile);
+      const cropped = settings
+        ? processPage(source, { ...settings, corners: reviewCorners }, 2400)
+        : warpPerspective(source, reviewCorners, 3000);
       const blob = await new Promise<Blob>((resolve, reject) =>
         cropped.toBlob(
           (value) => (value ? resolve(value) : reject(new Error("CROP_FAILED"))),
@@ -272,6 +278,11 @@ export function ImagePickers({
       nextApproved.delete(reviewFile);
       nextApproved.add(file);
       setCaptured(nextFiles);
+      setReviewSettings((old) => {
+        const next = new Map(old);
+        next.delete(reviewFile);
+        return next;
+      });
       setApproved(nextApproved);
       const next = nextFiles.find((item) => !nextApproved.has(item));
       beginReview(next ?? file);
@@ -289,6 +300,7 @@ export function ImagePickers({
     setCaptured([]);
     setApproved(new Set());
     setReviewFile(null);
+    setReviewSettings(new Map());
     onFiles(files);
   };
 
@@ -571,6 +583,45 @@ export function ImagePickers({
                 <ChevronRight />
               </Button>
               <Button
+                variant="ghost"
+                className="camera-tool"
+                size="icon"
+                aria-label={t("edit")}
+                title={t("edit")}
+                disabled={reviewBusy || approved.has(reviewFile)}
+                onClick={() => setEditingReview(true)}
+              >
+                <SlidersHorizontal />
+              </Button>
+              <Button
+                variant="ghost"
+                className="camera-tool"
+                size="icon"
+                aria-label={t("removeCaptured")}
+                title={t("removeCaptured")}
+                disabled={reviewBusy}
+                onClick={() => {
+                  const index = captured.indexOf(reviewFile);
+                  const remaining = captured.filter((file) => file !== reviewFile);
+                  setCaptured(remaining);
+                  setApproved((old) => {
+                    const next = new Set(old);
+                    next.delete(reviewFile);
+                    return next;
+                  });
+                  setReviewSettings((old) => {
+                    const next = new Map(old);
+                    next.delete(reviewFile);
+                    return next;
+                  });
+                  const next = remaining[Math.min(index, remaining.length - 1)];
+                  if (next) beginReview(next);
+                  else setReviewFile(null);
+                }}
+              >
+                <Minus />
+              </Button>
+              <Button
                 disabled={reviewBusy || approved.has(reviewFile)}
                 onClick={() => void acceptReview()}
               >
@@ -582,53 +633,6 @@ export function ImagePickers({
                   {cameraError}
                 </p>
               )}
-            </div>
-          )}
-          {previews.length > 0 && (
-            <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-stage-foreground/15 px-3 py-2">
-              {previews.map(({ file, url }, index) => (
-                <div key={file.name} className="relative h-16 w-12 shrink-0">
-                  <Button
-                    variant="ghost"
-                    disabled={reviewBusy || capturing}
-                    onClick={() => beginReview(file)}
-                    aria-label={`${t("page")} ${index + 1}`}
-                    className={`h-full w-full overflow-hidden rounded-md p-0 ${reviewFile === file ? "ring-2 ring-primary" : ""}`}
-                  >
-                    <img
-                      src={url}
-                      alt={`${t("page")} ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </Button>
-                  {approved.has(file) && (
-                    <Check className="pointer-events-none absolute bottom-0 start-0 size-5 rounded-full bg-success text-primary-foreground" />
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    disabled={reviewBusy || capturing}
-                    aria-label={`${t("removeCaptured")} ${index + 1}`}
-                    onClick={() => {
-                      const remaining = captured.filter((item) => item !== file);
-                      setCaptured(remaining);
-                      setApproved((old) => {
-                        const next = new Set(old);
-                        next.delete(file);
-                        return next;
-                      });
-                      if (reviewFile === file) {
-                        const next = remaining[Math.min(index, remaining.length - 1)];
-                        if (next) beginReview(next);
-                        else setReviewFile(null);
-                      }
-                    }}
-                    className="absolute -end-1 -top-1 size-6 rounded-full bg-stage text-stage-foreground"
-                  >
-                    <Minus className="size-3" />
-                  </Button>
-                </div>
-              ))}
             </div>
           )}
           <footer className="shrink-0 border-t border-stage-foreground/15 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -697,15 +701,25 @@ export function ImagePickers({
                   </Button>
                   <Button
                     variant="ghost"
-                    className="camera-tool h-auto min-h-12 whitespace-normal"
+                    className="camera-tool relative mx-auto size-14"
+                    size="icon"
+                    aria-label={t("cameraReview")}
+                    title={t("cameraReview")}
                     onClick={() => {
                       const file = captured.find((item) => !approved.has(item)) ?? captured[0];
                       if (file) beginReview(file);
                     }}
                     disabled={!captured.length || capturing}
                   >
-                    <Check />
-                    {t("cameraReview")}
+                    <Images className="size-7" />
+                    {captured.length > 0 && (
+                      <span
+                        className="absolute -end-1 -top-1 grid min-w-6 place-items-center rounded-full bg-primary px-1 text-xs leading-6 text-primary-foreground"
+                        aria-hidden="true"
+                      >
+                        {captured.length}
+                      </span>
+                    )}
                   </Button>
                 </div>
                 {cameraError && (
@@ -724,6 +738,36 @@ export function ImagePickers({
               </>
             )}
           </footer>
+          {editingReview && reviewFile && (
+            <div className="fixed inset-0 z-[80] text-foreground">
+              <PageEditor
+                key={reviewFile.name}
+                page={{
+                  id: reviewFile.name,
+                  docId: "camera-review",
+                  original: reviewFile,
+                  processed: reviewFile,
+                  thumb: "",
+                  width: reviewImageSize.width,
+                  height: reviewImageSize.height,
+                  createdAt: reviewFile.lastModified,
+                  autoDetected: false,
+                  settings: {
+                    ...defaultSettings(reviewCorners),
+                    filter: "original",
+                    sharpen: 0,
+                    ...reviewSettings.get(reviewFile),
+                    corners: reviewCorners,
+                  },
+                }}
+                onSave={async (settings) => {
+                  setReviewSettings((old) => new Map(old).set(reviewFile, settings));
+                  setReviewCorners(settings.corners);
+                }}
+                onClose={() => setEditingReview(false)}
+              />
+            </div>
+          )}
         </div>
       )}
     </>
