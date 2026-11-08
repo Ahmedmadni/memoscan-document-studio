@@ -52,9 +52,10 @@ Also check multi-shot camera capture after accepting/cancelling a crop, navigati
 
 ## Latest verified CI result
 
-- Commit `3c9323f37925ba559b3cc0353405c2f4c18865ef`: GitHub Actions run [41618669198](https://github.com/Ahmedmadni/memoscan-document-studio/actions/runs/41618669198) completed successfully (tests, lint, web build, Capacitor sync, Gradle `assembleDebug`).
-- Artifact `waraqah-android-debug-apk` (~5.2 MB) was uploaded, retained 14 days.
-- Local checks for the same code: Prettier clean, typecheck clean, 70/70 Vitest tests passed, ESLint 0 errors (7 existing warnings), production build succeeded.
+- Commit `ea37036ea6613f91999c68c29095daa203bcce6a` ("Added whiteout, clarity & review"): GitHub Actions run [41978832463](https://github.com/Ahmedmadni/memoscan-document-studio/actions/runs/41978832463) completed successfully (tests, lint, web build, Capacitor sync, Gradle `assembleDebug`).
+- Artifact `waraqah-android-debug-apk` (5,174,302 bytes) was uploaded on 2026-11-05, retained 14 days.
+- This build includes the portrait batch camera, per-page review/approval, paper whitening, clear-text filter and mild curved-edge correction.
+- Local checks for the same code: 80/80 Vitest tests passed, Prettier clean, ESLint 0 errors (7 existing warnings), production build succeeded.
 - Not yet tested on a physical Android device.
 
 ## Physical device test checklist
