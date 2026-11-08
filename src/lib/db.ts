@@ -1,12 +1,16 @@
 // Local persistence in IndexedDB. Browser-only: call from effects/handlers.
 import type { EditSettings } from "./imaging";
 
+export type DocCategory = "contracts" | "invoices" | "ids" | "signed";
+
 export interface DocRecord {
   id: string;
   name: string;
   createdAt: number;
   updatedAt: number;
   pageIds: string[];
+  category?: DocCategory | undefined;
+  notes?: string | undefined;
 }
 
 export interface PageRecord {
@@ -77,9 +81,16 @@ export async function putDoc(doc: DocRecord) {
   await wrap((await store("docs", "readwrite")).put(doc));
 }
 
-export async function createDoc(name: string): Promise<DocRecord> {
+export async function createDoc(name: string, category?: DocCategory): Promise<DocRecord> {
   const now = Date.now();
-  const doc: DocRecord = { id: uid(), name, createdAt: now, updatedAt: now, pageIds: [] };
+  const doc: DocRecord = {
+    id: uid(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    pageIds: [],
+    ...(category ? { category } : {}),
+  };
   await putDoc(doc);
   return doc;
 }

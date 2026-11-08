@@ -50,8 +50,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Run tests and lint
+      - name: Auto-format check and run tests + lint
         run: |
+          bunx prettier --write src
           bun run test
           bun run lint
 
@@ -109,7 +110,7 @@ jobs:
           test -s android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           test -s "$adaptive/ic_launcher.xml"
 
-      - name: Ensure in-app camera permission
+      - name: Ensure in-app camera and hardware acceleration permissions
         run: |
           manifest="android/app/src/main/AndroidManifest.xml"
           test -f "$manifest"
@@ -127,9 +128,15 @@ jobs:
           grep -R -q 'ورقة' .output/public
           test -s .output/public/memoscan-logo.svg
 
-      - name: Build debug APK
+      - name: Build debug and release APKs
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          ./gradlew assembleDebug assembleRelease --no-daemon
+          if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            keytool -genkeypair -v -keystore release-ci.keystore -alias waraqah -keyalg RSA -keysize 2048 -validity 10000 -storepass waraqah123 -keypass waraqah123 -dname "CN=Ahmed Elmadani, OU=Waraqah, O=MemoScan, L=Riyadh, ST=Riyadh, C=SA"
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+            "$APKSIGNER" sign --ks release-ci.keystore --ks-pass pass:waraqah123 --key-pass pass:waraqah123 --out app/build/outputs/apk/release/waraqah-release-signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
 
       - name: Verify APK exists
         run: test -s android/app/build/outputs/apk/debug/app-debug.apk
@@ -141,3 +148,12 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload signed release APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: waraqah-android-release-apk
+          path: android/app/build/outputs/apk/release/waraqah-release-signed.apk
+          if-no-files-found: ignore
+          retention-days: 30

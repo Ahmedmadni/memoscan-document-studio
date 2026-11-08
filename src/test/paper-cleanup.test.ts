@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyAdjustments,
   defaultSettings,
+  magicColorEnhance,
+  removeSignatureBackground,
   straightenCurvedPaper,
   whitenPaper,
 } from "@/lib/imaging";
@@ -66,5 +68,21 @@ describe("local paper cleanup", () => {
     expect(img.data[(20 * 120 + 60) * 4]).toBe(255);
     expect(img.width).toBe(120);
     expect(img.height).toBe(100);
+  });
+  it("magic color whitens background and boosts colored ink", () => {
+    const img = image(64, 64, (x, y) => {
+      if (y === 32 && x > 10 && x < 50) return [20, 50, 160, 255];
+      return [230, 226, 215, 255];
+    });
+    magicColorEnhance(img);
+    expect(img.data[(10 * 64 + 10) * 4]).toBe(255);
+    const ink = (32 * 64 + 30) * 4;
+    expect(img.data[ink + 2]).toBeGreaterThan(img.data[ink]);
+  });
+  it("removes light paper background from photographed signature while keeping dark ink", () => {
+    const img = image(20, 20, (x, y) => (x === 10 && y === 10 ? [20, 30, 80, 255] : [240, 240, 240, 255]));
+    removeSignatureBackground(img, 210);
+    expect(img.data[3]).toBe(0);
+    expect(img.data[(10 * 20 + 10) * 4 + 3]).toBe(255);
   });
 });

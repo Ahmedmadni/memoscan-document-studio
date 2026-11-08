@@ -1,6 +1,7 @@
 import {
   Camera,
   Check,
+  Grid3X3,
   ImagePlus,
   Minus,
   X,
@@ -55,6 +56,7 @@ export function ImagePickers({
   });
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [showGrid, setShowGrid] = useState(true);
   const [controlBusy, setControlBusy] = useState(false);
   const [controlError, setControlError] = useState("");
   const [approved, setApproved] = useState<Set<File>>(new Set());
@@ -390,6 +392,17 @@ export function ImagePickers({
               >
                 <SwitchCamera />
               </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="camera-tool"
+                title={t("cameraGrid")}
+                aria-label={t("cameraGrid")}
+                aria-pressed={showGrid}
+                onClick={() => setShowGrid((g) => !g)}
+              >
+                <Grid3X3 />
+              </Button>
               {controls.zoom && (
                 <label className="flex min-w-0 items-center gap-2 text-xs">
                   {t("cameraZoom")}
@@ -417,6 +430,19 @@ export function ImagePickers({
               playsInline
               className={`absolute inset-0 h-full w-full object-contain ${reviewFile ? "invisible" : ""}`}
             />
+            {showGrid && !reviewFile && (
+              <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-25">
+                <div className="border-e border-b border-stage-foreground" />
+                <div className="border-e border-b border-stage-foreground" />
+                <div className="border-b border-stage-foreground" />
+                <div className="border-e border-b border-stage-foreground" />
+                <div className="border-e border-b border-stage-foreground" />
+                <div className="border-b border-stage-foreground" />
+                <div className="border-e border-stage-foreground" />
+                <div className="border-e border-stage-foreground" />
+                <div />
+              </div>
+            )}
             {reviewFile && reviewUrl ? (
               <div className="relative flex h-full w-full items-center justify-center p-4">
                 <img

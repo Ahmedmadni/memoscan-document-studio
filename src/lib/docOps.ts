@@ -1,5 +1,6 @@
-import { getDoc, putDoc, putPage, type DocRecord } from "./db";
-import { buildPage } from "./pages";
+import { createDoc, getDoc, getPages, putDoc, putPage, uid, type DocRecord } from "./db";
+import type { FilterMode } from "./imaging";
+import { buildPage, renderOutputs } from "./pages";
 
 export interface ImportResult {
   added: number;
@@ -35,6 +36,44 @@ export async function addFilesToDoc(
     await putDoc(next);
   }
   return { added, failed, firstError };
+}
+
+/** Batch-apply a CamScanner filter across every page in a document. */
+export async function applyFilterToAllPages(
+  docId: string,
+  filter: FilterMode,
+  onProgress?: (done: number, total: number) => void,
+) {
+  const doc = await getDoc(docId);
+  if (!doc) return;
+  const pages = await getPages(doc);
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i]!;
+    const settings = { ...p.settings, filter };
+    const out = await renderOutputs(p.original, settings);
+    await putPage({ ...p, ...out, settings });
+    onProgress?.(i + 1, pages.length);
+  }
+  await putDoc({ ...doc, updatedAt: Date.now() });
+}
+
+/** Merge multiple documents into a new multi-page document without altering originals. */
+export async function mergeDocuments(docIds: string[], mergedName: string): Promise<DocRecord> {
+  const target = await createDoc(mergedName);
+  const newPageIds: string[] = [];
+  for (const id of docIds) {
+    const srcDoc = await getDoc(id);
+    if (!srcDoc) continue;
+    const pages = await getPages(srcDoc);
+    for (const p of pages) {
+      const copyId = uid();
+      await putPage({ ...p, id: copyId, docId: target.id, createdAt: Date.now() });
+      newPageIds.push(copyId);
+    }
+  }
+  const updated: DocRecord = { ...target, pageIds: newPageIds, updatedAt: Date.now() };
+  await putDoc(updated);
+  return updated;
 }
 
 export function defaultDocName(prefix: string, lang: string) {

@@ -4,7 +4,15 @@
 export type Pt = { x: number; y: number };
 /** Normalized (0..1) corners in order: top-left, top-right, bottom-right, bottom-left. */
 export type Corners = [Pt, Pt, Pt, Pt];
-export type FilterMode = "original" | "enhance" | "gray" | "bw" | "clean" | "paper" | "text";
+export type FilterMode =
+  | "original"
+  | "magic"
+  | "enhance"
+  | "gray"
+  | "bw"
+  | "clean"
+  | "paper"
+  | "text";
 export type Rotation = 0 | 90 | 180 | 270;
 
 export interface EditSettings {
@@ -65,7 +73,6 @@ export async function loadImageCanvas(blob: Blob, maxDim = 2400): Promise<HTMLCa
   const isHeic = /image\/(heic|heif)/i.test(blob.type) || /\.(heic|heif)$/i.test(fileName);
   let width = 0;
   let height = 0;
-  let draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
 
   if (typeof createImageBitmap === "function") {
     let bmp: ImageBitmap | null = null;
@@ -417,6 +424,98 @@ export function whitenPaper(img: ImageData) {
   }
 }
 
+/**
+ * CamScanner-style Magic Color enhancement:
+ * Whitens uneven/shaded paper background while deepening dark text and boosting
+ * colored ink (blue signatures, red/green official stamps).
+ */
+export function magicColorEnhance(img: ImageData) {
+  whitenPaper(img);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i],
+      g = d[i + 1],
+      b = d[i + 2];
+    const l = 0.299 * r + 0.587 * g + 0.114 * b;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    if (l > 228 && chroma < 24) {
+      d[i] = d[i + 1] = d[i + 2] = 255;
+      continue;
+    }
+    // S-curve contrast on luminance + vivid ink boost for colored stamps/signatures
+    const norm = l / 255;
+    const curved = norm < 0.5 ? 2 * norm * norm : 1 - Math.pow(-2 * norm + 2, 2) / 2;
+    const targetL = curved * 255;
+    const satBoost = chroma > 18 ? 1.45 : 1.1;
+    for (let c = 0; c < 3; c++) {
+      const val = targetL + (d[i + c] - l) * satBoost;
+      d[i + c] = Math.min(255, Math.max(0, Math.round(val)));
+    }
+  }
+}
+
+/**
+ * Remove light paper background from a photographed signature or stamp, leaving
+ * clean anti-aliased ink on a transparent background.
+ */
+export function removeSignatureBackground(img: ImageData, threshold = 210) {
+  const d = img.data;
+  const softSpan = 35;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i],
+      g = d[i + 1],
+      b = d[i + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum >= threshold) {
+      d[i + 3] = 0;
+    } else if (lum > threshold - softSpan) {
+      const alphaFactor = (threshold - lum) / softSpan;
+      d[i + 3] = Math.round(d[i + 3] * alphaFactor);
+    } else {
+      // Deepen ink slightly for crisp placement on PDFs
+      d[i] = Math.max(0, Math.round(r * 0.85));
+      d[i + 1] = Math.max(0, Math.round(g * 0.85));
+      d[i + 2] = Math.max(0, Math.round(b * 0.85));
+    }
+  }
+}
+
+/**
+ * Compose front and back ID card / passport scans onto a single A4 portrait canvas
+ * with clean margins and subtle corner guides.
+ */
+export function composeIdCardSheet(
+  front: HTMLCanvasElement,
+  back?: HTMLCanvasElement,
+  maxDim = 2400,
+): HTMLCanvasElement {
+  const sheetW = Math.round(maxDim * (210 / 297));
+  const sheetH = maxDim;
+  const sheet = makeCanvas(sheetW, sheetH);
+  const ctx = ctx2d(sheet);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, sheetW, sheetH);
+
+  const cardMaxW = Math.round(sheetW * 0.68);
+  const cardMaxH = Math.round(sheetH * 0.36);
+
+  const drawSlot = (card: HTMLCanvasElement, centerY: number) => {
+    const scale = Math.min(cardMaxW / card.width, cardMaxH / card.height);
+    const w = Math.round(card.width * scale);
+    const h = Math.round(card.height * scale);
+    const x = Math.round((sheetW - w) / 2);
+    const y = Math.round(centerY - h / 2);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = Math.max(2, Math.round(sheetW * 0.0015));
+    ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
+    ctx.drawImage(card, x, y, w, h);
+  };
+
+  drawSlot(front, back ? sheetH * 0.3 : sheetH * 0.5);
+  if (back) drawSlot(back, sheetH * 0.72);
+  return sheet;
+}
+
 /** Rectify mild side-edge curl by mapping each row's visible paper span to a rectangle.
  * Only light sheets with broad, dark side-background runs qualify. This is not 3D
  * book dewarping: hidden writing and severely bent text cannot be reconstructed.
@@ -547,6 +646,7 @@ function adaptiveThreshold(img: ImageData, offset: number) {
 
 export function applyAdjustments(img: ImageData, s: EditSettings) {
   const d = img.data;
+  if (s.filter === "magic") magicColorEnhance(img);
   if (s.filter === "clean") flattenPaperLighting(img);
   if (s.filter === "paper" || s.filter === "text") whitenPaper(img);
   if (s.filter === "enhance") autoLevels(d);

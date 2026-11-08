@@ -1,33 +1,73 @@
-import { Download, Eraser, FileSignature, ImagePlus, Upload } from "lucide-react";
+import {
+  BookmarkPlus,
+  Calendar,
+  Download,
+  Eraser,
+  FileSignature,
+  ImagePlus,
+  Pin,
+  ShieldCheck,
+  Stamp,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PageHeading } from "@/components/PageHeading";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/lib/i18n";
-import { downloadBlob, safeFilename, shareFile } from "@/lib/pdf";
+import { consumePendingSignPdf, downloadBlob, safeFilename, shareFile } from "@/lib/pdf";
 import { isNative } from "@/lib/native";
 import {
   clampPlacement,
+  computePdfSha256,
+  createDateStampImage,
+  createOfficialStamp,
   createSignedPdf,
   displaySize,
   hasSignatureInk,
   INITIAL_PLACEMENT,
+  listSavedSignatures,
   loadSigningPdf,
   readSignatureImage,
+  removeSavedSignature,
+  saveSignatureToVault,
   type PageGeometry,
+  type PinnedOverlay,
+  type SavedSignatureItem,
   type SignatureImage,
+  type StampPreset,
 } from "@/lib/signature";
 import { toast } from "sonner";
+
+const INK_COLORS = [
+  { id: "blue", value: "#142b55", labelKey: "inkBlue" as const },
+  { id: "black", value: "#111827", labelKey: "inkBlack" as const },
+  { id: "red", value: "#b91c1c", labelKey: "inkRed" as const },
+  { id: "green", value: "#15803d", labelKey: "inkGreen" as const },
+];
 
 export function SigningWorkspace() {
   const { t } = useI18n();
   const [pdf, setPdf] = useState<{ name: string; bytes: Uint8Array; pages: PageGeometry[] } | null>(
     null,
   );
+  const [docHash, setDocHash] = useState("");
+  const [includeAuditFooter, setIncludeAuditFooter] = useState(true);
   const [pageIndex, setPageIndex] = useState(0);
   const [applyToAllPages, setApplyToAllPages] = useState(false);
   const [signature, setSignature] = useState<SignatureImage | null>(null);
-  const [mode, setMode] = useState<"draw" | "image">("draw");
+  const [pinned, setPinned] = useState<PinnedOverlay[]>([]);
+  const [mode, setMode] = useState<"draw" | "image" | "stamp">("draw");
+  const [inkColor, setInkColor] = useState("#142b55");
+  const [penWidth, setPenWidth] = useState(3.5);
+  const [opacity, setOpacity] = useState(0.95);
+  const [autoRemoveBg, setAutoRemoveBg] = useState(true);
+  const [stampPreset, setStampPreset] = useState<StampPreset>("approved");
+  const [stampHolder, setStampHolder] = useState("أحمد المدني");
+  const [watermarkText, setWatermarkText] = useState("");
+  const [vault, setVault] = useState<SavedSignatureItem[]>([]);
   const [placement, setPlacement] = useState(INITIAL_PLACEMENT);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -42,6 +82,23 @@ export function SigningWorkspace() {
   const revision = useRef({ pdf: 0, image: 0 });
   const page = pdf?.pages[pageIndex];
   const safe = page && signature ? clampPlacement(placement, signature.aspect, page) : placement;
+
+  useEffect(() => {
+    setVault(listSavedSignatures());
+    const pending = consumePendingSignPdf();
+    if (pending) {
+      void loadSigningPdf(pending.bytes)
+        .then(async (pages) => {
+          setPdf({ name: pending.name, bytes: pending.bytes, pages });
+          setDocHash(await computePdfSha256(pending.bytes));
+          setPageIndex(0);
+          setPlacement(INITIAL_PLACEMENT);
+          setPinned([]);
+          setPreview("loading");
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!pdf || !previewRef.current) return;
@@ -69,10 +126,13 @@ export function SigningWorkspace() {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const pages = await loadSigningPdf(bytes);
+      const hash = await computePdfSha256(bytes);
       if (id !== revision.current.pdf) return;
       setPdf({ name: file.name, bytes, pages });
+      setDocHash(hash);
       setPageIndex(0);
       setPlacement(INITIAL_PLACEMENT);
+      setPinned([]);
       setPreview("loading");
     } catch {
       if (id === revision.current.pdf) setError(t("signBadPdf"));
@@ -87,7 +147,7 @@ export function SigningWorkspace() {
     setImporting(true);
     setError(null);
     try {
-      const image = await readSignatureImage(file);
+      const image = await readSignatureImage(file, autoRemoveBg);
       if (id !== revision.current.image) return;
       setSignature(image);
       setMode("image");
@@ -113,10 +173,11 @@ export function SigningWorkspace() {
       ((e.clientX - r.left) * canvas.width) / r.width,
       ((e.clientY - r.top) * canvas.height) / r.height,
     );
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = penWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = getComputedStyle(canvas).getPropertyValue("--signature-ink").trim();
+    ctx.strokeStyle =
+      inkColor || getComputedStyle(canvas).getPropertyValue("--signature-ink").trim();
     setError(null);
   }
   function moveDraw(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -144,11 +205,21 @@ export function SigningWorkspace() {
     setSignature({ data: c.toDataURL("image/png"), aspect: c.height / c.width });
   }
   async function exportPdf() {
-    if (!pdf || !signature || preview !== "ready" || importing) return;
+    if (!pdf || (!signature && !pinned.length) || preview !== "ready" || importing) return;
     setBusy(true);
     setError(null);
     try {
-      const bytes = await createSignedPdf(pdf.bytes, signature, pageIndex, safe, applyToAllPages);
+      const bytes = await createSignedPdf(
+        pdf.bytes,
+        signature,
+        pageIndex,
+        safe,
+        applyToAllPages,
+        watermarkText,
+        opacity,
+        pinned,
+        includeAuditFooter,
+      );
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const name = safeFilename(pdf.name.replace(/\.pdf$/i, "") + "-signed");
       if (isNative()) {
@@ -163,6 +234,8 @@ export function SigningWorkspace() {
   }
   const disabled = busy || importing;
   const pageSize = page ? displaySize(page) : { width: 1, height: 1 };
+  const pagePinned = pinned.filter((item) => item.pageIndex === pageIndex);
+
   return (
     <div className="min-h-screen">
       <AppHeader />
@@ -197,6 +270,14 @@ export function SigningWorkspace() {
               {pdf?.name || t("choosePdf")}
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">{t("signOriginal")}</p>
+            {docHash && (
+              <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-primary">
+                <ShieldCheck className="size-3.5 shrink-0" />
+                <span>
+                  {t("docSha256Label")}: {docHash.slice(0, 16)}…
+                </span>
+              </p>
+            )}
           </div>
           <div>
             <h2 className="mb-2 font-semibold">{t("signSource")}</h2>
@@ -235,6 +316,39 @@ export function SigningWorkspace() {
                 <ImagePlus className="me-2 size-4" />
                 {t("signImport")}
               </Button>
+              <Button
+                disabled={disabled}
+                variant={mode === "stamp" ? "default" : "outline"}
+                onClick={() => {
+                  setMode("stamp");
+                  setError(null);
+                  setSignature(createOfficialStamp(stampPreset, stampHolder, inkColor));
+                }}
+              >
+                <Stamp className="me-2 size-4" />
+                {t("signStamp")}
+              </Button>
+              <Button
+                disabled={disabled}
+                variant="outline"
+                onClick={() => {
+                  setError(null);
+                  setSignature(createDateStampImage(inkColor));
+                }}
+              >
+                <Calendar className="me-2 size-4" />
+                {t("signDateStamp")}
+              </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
+              <label className="inline-flex items-center gap-2">
+                <Switch
+                  aria-label={t("autoRemoveBg")}
+                  checked={autoRemoveBg}
+                  onCheckedChange={setAutoRemoveBg}
+                />
+                <span>{t("autoRemoveBg")}</span>
+              </label>
             </div>
           </div>
         </section>
@@ -245,22 +359,49 @@ export function SigningWorkspace() {
         )}
         {mode === "draw" && (
           <section className="mb-6 border-b pb-6">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{t("signBox")}</h2>
-              <Button
-                disabled={disabled}
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  const c = canvasRef.current;
-                  if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
-                  setSignature(null);
-                  setError(null);
-                }}
-              >
-                <Eraser className="me-2 size-4" />
-                {t("clear")}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {INK_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-label={t(c.labelKey)}
+                    title={t(c.labelKey)}
+                    onClick={() => setInkColor(c.value)}
+                    className={`size-6 rounded-full border-2 ${
+                      inkColor === c.value ? "ring-2 ring-primary ring-offset-2" : "border-border"
+                    }`}
+                    style={{ backgroundColor: c.value }}
+                  />
+                ))}
+                <label className="ms-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  {t("penWidth")}
+                  <input
+                    type="range"
+                    min="1.5"
+                    max="7"
+                    step="0.5"
+                    value={penWidth}
+                    onChange={(e) => setPenWidth(Number(e.target.value))}
+                    className="w-20 accent-primary"
+                  />
+                </label>
+                <Button
+                  disabled={disabled}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const c = canvasRef.current;
+                    if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
+                    setSignature(null);
+                    setError(null);
+                  }}
+                >
+                  <Eraser className="me-2 size-4" />
+                  {t("clear")}
+                </Button>
+              </div>
             </div>
             <canvas
               ref={canvasRef}
@@ -275,6 +416,60 @@ export function SigningWorkspace() {
             />
           </section>
         )}
+        {mode === "stamp" && (
+          <section className="mb-6 grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                {t("stampType")}
+              </label>
+              <select
+                aria-label={t("stampType")}
+                value={stampPreset}
+                onChange={(e) => {
+                  const p = e.target.value as StampPreset;
+                  setStampPreset(p);
+                  setSignature(createOfficialStamp(p, stampHolder, inkColor));
+                }}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="approved">{t("stampApproved")}</option>
+                <option value="certified">{t("stampCertified")}</option>
+                <option value="confidential">{t("stampConfidential")}</option>
+                <option value="reviewed">{t("stampReviewed")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                {t("stampHolder")}
+              </label>
+              <input
+                value={stampHolder}
+                onChange={(e) => {
+                  setStampHolder(e.target.value);
+                  setSignature(createOfficialStamp(stampPreset, e.target.value, inkColor));
+                }}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              {INK_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-label={t(c.labelKey)}
+                  onClick={() => {
+                    setInkColor(c.value);
+                    setSignature(createOfficialStamp(stampPreset, stampHolder, c.value));
+                  }}
+                  className={`size-8 rounded-full border-2 ${
+                    inkColor === c.value ? "ring-2 ring-primary ring-offset-2" : "border-border"
+                  }`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+            </div>
+          </section>
+        )}
         {signature && (
           <section className="mb-6 flex flex-wrap items-center gap-4 border-b pb-6">
             <span className="text-sm font-medium">{t("signPreview")}</span>
@@ -285,12 +480,101 @@ export function SigningWorkspace() {
             />
             <Button
               disabled={disabled}
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const updated = saveSignatureToVault(
+                  mode === "stamp" ? stampHolder || "Stamp" : "Signature",
+                  signature,
+                );
+                setVault(updated);
+                toast.success(t("saved"));
+              }}
+            >
+              <BookmarkPlus className="me-1 size-4" />
+              {t("saveToVault")}
+            </Button>
+            {pdf && (
+              <Button
+                disabled={disabled}
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setPinned((prev) => [
+                    ...prev,
+                    {
+                      id: `${Date.now()}-${prev.length}`,
+                      signature,
+                      pageIndex,
+                      placement: safe,
+                      opacity,
+                    },
+                  ]);
+                  setPlacement({
+                    x: Math.min(0.7, safe.x + 0.06),
+                    y: Math.min(0.8, safe.y + 0.06),
+                    width: safe.width,
+                  });
+                  toast.success(t("saved"));
+                }}
+              >
+                <Pin className="me-1 size-4" />
+                {t("pinOverlay")}
+              </Button>
+            )}
+            <Button
+              disabled={disabled}
               variant="ghost"
               size="sm"
               onClick={() => setSignature(null)}
             >
               {t("remove")}
             </Button>
+          </section>
+        )}
+        {pinned.length > 0 && (
+          <section className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 text-xs">
+            <span>
+              {t("pinnedOverlays")}: <strong>{pinned.length}</strong>
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setPinned([])}>
+              {t("clearPinned")}
+            </Button>
+          </section>
+        )}
+        {vault.length > 0 && (
+          <section className="mb-6 border-b pb-6">
+            <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+              {t("savedSignatures")}
+            </h3>
+            <div className="flex flex-wrap gap-3">
+              {vault.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSignature(item.image)}
+                    className="flex items-center gap-2"
+                  >
+                    <img
+                      src={item.image.data}
+                      alt={item.label}
+                      className="h-9 w-20 object-contain"
+                    />
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("delete")}
+                    onClick={() => setVault(removeSavedSignature(item.id))}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </section>
         )}
         {pdf && (
@@ -346,6 +630,27 @@ export function SigningWorkspace() {
                 {t("signAllPages")}
               </label>
             </fieldset>
+            <div className="mb-4 flex flex-wrap items-center gap-6">
+              <div className="min-w-64 flex-1 max-w-md">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t("watermarkLabel")}
+                </label>
+                <input
+                  value={watermarkText}
+                  onChange={(e) => setWatermarkText(e.target.value)}
+                  placeholder={t("watermarkPlaceholder")}
+                  className="h-9 w-full rounded-md border bg-card px-3 text-sm"
+                />
+              </div>
+              <label className="inline-flex items-center gap-2 text-xs">
+                <Switch
+                  aria-label={t("includeAuditFooter")}
+                  checked={includeAuditFooter}
+                  onCheckedChange={setIncludeAuditFooter}
+                />
+                <span>{t("includeAuditFooter")}</span>
+              </label>
+            </div>
             {preview === "loading" && (
               <p role="status" className="mb-3 text-sm">
                 {t("signPreviewLoading")}
@@ -365,6 +670,23 @@ export function SigningWorkspace() {
                 aria-label={t("signPdf")}
                 className={`block h-auto max-w-full ${preview !== "ready" ? "invisible" : ""}`}
               />
+              {preview === "ready" &&
+                pagePinned.map((item) => (
+                  <img
+                    key={item.id}
+                    src={item.signature.data}
+                    alt=""
+                    draggable={false}
+                    className="pointer-events-none absolute border border-primary/40"
+                    style={{
+                      left: `${item.placement.x * 100}%`,
+                      top: `${item.placement.y * 100}%`,
+                      width: `${item.placement.width * 100}%`,
+                      opacity: item.opacity ?? 1,
+                      height: "auto",
+                    }}
+                  />
+                ))}
               {signature && preview === "ready" && (
                 <img
                   src={signature.data}
@@ -407,40 +729,59 @@ export function SigningWorkspace() {
                     left: `${safe.x * 100}%`,
                     top: `${safe.y * 100}%`,
                     width: `${safe.width * 100}%`,
+                    opacity,
                     height: "auto",
                   }}
                 />
               )}
             </div>
-            <div className="mx-auto mt-4 flex max-w-xl items-center gap-3">
-              <label htmlFor="signature-size" className="shrink-0 text-sm">
-                {t("signSize")}
-              </label>
-              <input
-                id="signature-size"
-                type="range"
-                disabled={disabled || !signature}
-                min="0.001"
-                max="0.5"
-                step="0.001"
-                value={safe.width}
-                onChange={(e) => {
-                  if (page && signature)
-                    setPlacement(
-                      clampPlacement(
-                        { ...safe, width: Number(e.target.value) },
-                        signature.aspect,
-                        page,
-                      ),
-                    );
-                }}
-                className="min-w-0 flex-1"
-              />
+            <div className="mx-auto mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-3">
+                <label htmlFor="signature-size" className="shrink-0 text-sm">
+                  {t("signSize")}
+                </label>
+                <input
+                  id="signature-size"
+                  type="range"
+                  disabled={disabled || !signature}
+                  min="0.001"
+                  max="0.5"
+                  step="0.001"
+                  value={safe.width}
+                  onChange={(e) => {
+                    if (page && signature)
+                      setPlacement(
+                        clampPlacement(
+                          { ...safe, width: Number(e.target.value) },
+                          signature.aspect,
+                          page,
+                        ),
+                      );
+                  }}
+                  className="min-w-0 flex-1"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label htmlFor="signature-opacity" className="shrink-0 text-sm">
+                  {t("signOpacity")}
+                </label>
+                <input
+                  id="signature-opacity"
+                  type="range"
+                  disabled={disabled || !signature}
+                  min="0.3"
+                  max="1"
+                  step="0.05"
+                  value={opacity}
+                  onChange={(e) => setOpacity(Number(e.target.value))}
+                  className="min-w-0 flex-1"
+                />
+              </div>
             </div>
             <div className="mt-5 flex justify-end">
               <Button
                 onClick={() => void exportPdf()}
-                disabled={!signature || disabled || preview !== "ready"}
+                disabled={(!signature && !pinned.length) || disabled || preview !== "ready"}
               >
                 {busy ? (
                   t("exporting")

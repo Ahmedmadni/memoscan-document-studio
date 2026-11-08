@@ -1,5 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpLeft, FileSignature, FileText, ScanLine, ShieldCheck } from "lucide-react";
+import {
+  ArrowUpLeft,
+  CreditCard,
+  FileSignature,
+  FileText,
+  QrCode,
+  ScanLine,
+  ShieldCheck,
+  Stamp,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -112,6 +121,41 @@ function Home() {
                 <ArrowUpLeft className="size-5 shrink-0 text-muted-foreground ltr:rotate-90" />
               </Link>
             </Button>
+          </div>
+          <div className="mt-5">
+            <p className="mb-2.5 text-xs font-semibold text-muted-foreground">
+              {t("quickModesTitle")}
+            </p>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <Link
+                to="/scan"
+                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
+              >
+                <ScanLine className="size-4 shrink-0 text-primary" />
+                <span>{t("modeStandardDoc")}</span>
+              </Link>
+              <Link
+                to="/scan"
+                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
+              >
+                <CreditCard className="size-4 shrink-0 text-primary" />
+                <span>{t("modeIdCard2in1")}</span>
+              </Link>
+              <Link
+                to="/documents"
+                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
+              >
+                <QrCode className="size-4 shrink-0 text-primary" />
+                <span>{t("modeZatcaInvoice")}</span>
+              </Link>
+              <Link
+                to="/sign"
+                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
+              >
+                <Stamp className="size-4 shrink-0 text-primary" />
+                <span>{t("modeOfficialStamp")}</span>
+              </Link>
+            </div>
           </div>
         </section>
         <section className="border-t py-6">

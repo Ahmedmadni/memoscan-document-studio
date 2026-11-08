@@ -14,18 +14,21 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
   Copy,
   Download,
+  FileSignature,
   GripVertical,
   Loader2,
   Pencil,
+  QrCode,
   RefreshCw,
   Share2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,10 +37,27 @@ import { AppHeader } from "@/components/AppHeader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
-import { getDoc, getPages, putDoc, putPage, uid, type DocRecord, type PageRecord } from "@/lib/db";
-import { addFilesToDoc, insertAfter, movePage, reorderPages } from "@/lib/docOps";
+import { Switch } from "@/components/ui/switch";
+import {
+  getDoc,
+  getPages,
+  putDoc,
+  putPage,
+  uid,
+  type DocCategory,
+  type DocRecord,
+  type PageRecord,
+} from "@/lib/db";
+import {
+  addFilesToDoc,
+  applyFilterToAllPages,
+  insertAfter,
+  movePage,
+  reorderPages,
+} from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
+import type { FilterMode } from "@/lib/imaging";
 import { buildPage, renderOutputs } from "@/lib/pages";
 import { PendingDeletes } from "@/lib/pendingDeletes";
 import { isNative } from "@/lib/native";
@@ -47,10 +67,13 @@ import {
   exportPdf,
   formatBytes,
   safeFilename,
+  setPendingSignPdf,
   shareFile,
+  type PdfLayoutMode,
   type PdfPageSize,
   type PdfQuality,
 } from "@/lib/pdf";
+import { decodeZatcaTlvBase64, encodeZatcaTlvBase64, formatZatcaSummary } from "@/lib/zatca";
 
 export const Route = createFileRoute("/doc/$id")({
   head: () => ({
@@ -72,15 +95,30 @@ export const Route = createFileRoute("/doc/$id")({
   component: DocPage,
 });
 
+const BATCH_FILTERS: [FilterMode, TKey][] = [
+  ["magic", "fMagic"],
+  ["text", "fText"],
+  ["paper", "fPaper"],
+  ["enhance", "fEnhance"],
+  ["bw", "fBw"],
+  ["original", "fOriginal"],
+];
+
 function DocPage() {
   const { id } = Route.useParams();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const [doc, setDoc] = useState<DocRecord | null | undefined>(undefined);
   const [pages, setPages] = useState<PageRecord[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<PageRecord | null>(null);
   const [quality, setQuality] = useState<PdfQuality>("medium");
   const [size, setSize] = useState<PdfPageSize>("fit");
+  const [layout, setLayout] = useState<PdfLayoutMode>("standard");
+  const [pageNumbers, setPageNumbers] = useState(false);
+  const [watermarkText, setWatermarkText] = useState("");
+  const [notes, setNotes] = useState("");
+  const [zatcaInput, setZatcaInput] = useState("");
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
@@ -98,7 +136,10 @@ function DocPage() {
     try {
       const d = await getDoc(id);
       setDoc(d ?? null);
-      if (d) setPages(await getPages(d));
+      if (d) {
+        setNotes(d.notes ?? "");
+        setPages(await getPages(d));
+      }
     } catch (e) {
       toast.error(t(errorKey(e)));
       setDoc(null);
@@ -107,7 +148,7 @@ function DocPage() {
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => setPdf(null), [pages, quality, size]);
+  useEffect(() => setPdf(null), [pages, quality, size, layout, pageNumbers, watermarkText]);
 
   async function saveOrder(ids: string[], d = doc) {
     if (!d) return;
@@ -156,7 +197,7 @@ function DocPage() {
     const next = reorderPages(ids, from, to);
     if (next !== ids) void run("", () => saveOrder(next));
   };
-  const softDeletePage = (p: PageRecord, index: number) => {
+  const softDeletePage = (p: PageRecord) => {
     const manager = pendingDeletes.current;
     if (!manager) return;
     void run("", async () => {
@@ -183,6 +224,21 @@ function DocPage() {
     });
   };
 
+  function handleDecodeZatca(raw: string) {
+    const decoded = decodeZatcaTlvBase64(raw);
+    if (!decoded) {
+      toast.error(t("zatcaInvalid"));
+      return;
+    }
+    const block = formatZatcaSummary(decoded, lang);
+    const nextNotes = notes ? `${notes}\n\n${block}` : block;
+    setNotes(nextNotes);
+    void run("", () =>
+      saveOrder(ids, { ...doc!, notes: nextNotes, category: doc?.category ?? "invoices" }),
+    );
+    toast.success(t("zatcaSuccess"));
+  }
+
   return (
     <div className="min-h-screen">
       <AppHeader
@@ -197,15 +253,33 @@ function DocPage() {
         }
       />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-20">
-        <input
-          aria-label={t("docName")}
-          defaultValue={doc.name}
-          onBlur={(e) => {
-            const name = e.target.value.trim();
-            if (name && name !== doc.name) void run("", () => saveOrder(ids, { ...doc, name }));
-          }}
-          className="w-full rounded-lg border-0 bg-transparent font-display text-2xl font-semibold outline-none focus:ring-2 focus:ring-ring"
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <input
+            aria-label={t("docName")}
+            defaultValue={doc.name}
+            onBlur={(e) => {
+              const name = e.target.value.trim();
+              if (name && name !== doc.name) void run("", () => saveOrder(ids, { ...doc, name }));
+            }}
+            className="min-w-0 flex-1 rounded-lg border-0 bg-transparent font-display text-2xl font-semibold outline-none focus:ring-2 focus:ring-ring"
+          />
+          <select
+            aria-label={t("docCategory")}
+            value={doc.category ?? ""}
+            onChange={(e) => {
+              const val = (e.target.value || undefined) as DocCategory | undefined;
+              void run("", () => saveOrder(ids, { ...doc, category: val }));
+            }}
+            className="h-9 rounded-md border bg-card px-3 text-xs"
+          >
+            <option value="">{t("docCategory")}: —</option>
+            <option value="contracts">{t("catContracts")}</option>
+            <option value="invoices">{t("catInvoices")}</option>
+            <option value="ids">{t("catIds")}</option>
+            <option value="signed">{t("catSigned")}</option>
+          </select>
+        </div>
+
         <ImagePickers
           size="default"
           disabled={!!busy}
@@ -232,6 +306,31 @@ function DocPage() {
           </p>
         ) : (
           <>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3.5 text-primary" />
+                {t("batchFilterLabel")}:
+              </span>
+              {BATCH_FILTERS.map(([f, labelKey]) => (
+                <button
+                  key={f}
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() =>
+                    void run(t("processing"), async () => {
+                      await applyFilterToAllPages(doc.id, f, (a, b) =>
+                        setBusy(`${t("processing")} ${a}/${b}`),
+                      );
+                      await load();
+                      toast.success(t("appliedToAll"));
+                    })
+                  }
+                  className="chip text-xs"
+                >
+                  {t(labelKey)}
+                </button>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={ids} strategy={rectSortingStrategy}>
@@ -255,7 +354,7 @@ function DocPage() {
                         replaceTarget.current = p.id;
                         replaceInput.current?.click();
                       }}
-                      onDelete={() => softDeletePage(p, i)}
+                      onDelete={() => softDeletePage(p)}
                     />
                   ))}
                 </ul>
@@ -282,6 +381,100 @@ function DocPage() {
 
         {pages.length > 0 && (
           <section className="space-y-4 border-t pt-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">{t("ocrNotesTitle")}</h2>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const summary = pages
+                      .map(
+                        (p, idx) =>
+                          `[${t("page")} ${idx + 1}: ${p.width}×${p.height}px · ${p.settings.filter}]`,
+                      )
+                      .join("\n");
+                    const nextNotes = notes ? `${notes}\n${summary}` : summary;
+                    setNotes(nextNotes);
+                    void run("", () => saveOrder(ids, { ...doc, notes: nextNotes }));
+                  }}
+                >
+                  {t("autoAnalyzePage")}
+                </Button>
+                {notes && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(notes);
+                      toast.success(t("copiedText"));
+                    }}
+                  >
+                    <Copy className="me-1 size-3.5" />
+                    {t("copyText")}
+                  </Button>
+                )}
+              </div>
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => {
+                if (notes !== (doc.notes ?? "")) {
+                  void run("", () => saveOrder(ids, { ...doc, notes }));
+                }
+              }}
+              placeholder={t("ocrNotesPlaceholder")}
+              rows={4}
+              className="w-full rounded-lg border bg-card p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+
+            <div className="rounded-xl border bg-card p-3 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <QrCode className="size-4" />
+                  {t("zatcaTitle")}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const sampleB64 = encodeZatcaTlvBase64({
+                      sellerName: "مكتب أحمد المدني للاستشارات المالية",
+                      vatNumber: "300123456700003",
+                      timestamp: new Date().toISOString().slice(0, 19) + "Z",
+                      totalWithVat: "14950.00",
+                      vatAmount: "1950.00",
+                    });
+                    setZatcaInput(sampleB64);
+                    handleDecodeZatca(sampleB64);
+                  }}
+                >
+                  {t("zatcaSampleBtn")}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={zatcaInput}
+                  onChange={(e) => setZatcaInput(e.target.value)}
+                  placeholder={t("zatcaPlaceholder")}
+                  dir="ltr"
+                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleDecodeZatca(zatcaInput)}
+                >
+                  {t("zatcaDecodeBtn")}
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {pages.length > 0 && (
+          <section className="space-y-4 border-t pt-6">
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
             <Choice
               label={t("quality")}
@@ -302,20 +495,73 @@ function DocPage() {
                 ["a4", t("sizeA4")],
               ]}
             />
+            <Choice
+              label={t("layoutMode")}
+              value={layout}
+              onChange={setLayout}
+              options={[
+                ["standard", t("layoutStandard")],
+                ["id-card", t("layoutIdCard")],
+              ]}
+            />
+            <div className="flex flex-wrap items-center gap-6 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <Switch
+                  aria-label={t("pageNumbers")}
+                  checked={pageNumbers}
+                  onCheckedChange={setPageNumbers}
+                />
+                <span>{t("pageNumbers")}</span>
+              </label>
+              <input
+                value={watermarkText}
+                onChange={(e) => setWatermarkText(e.target.value)}
+                placeholder={t("watermarkLabel")}
+                className="h-9 min-w-56 rounded-md border bg-card px-3 text-sm"
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 disabled={!!busy}
                 onClick={() =>
                   run(t("processing"), async () => {
                     setPdf(
-                      await exportPdf(pages, { quality, pageSize: size }, (a, b) =>
-                        setBusy(`${t("processing")} ${a}/${b}`),
+                      await exportPdf(
+                        pages,
+                        { quality, pageSize: size, layout, pageNumbers, watermarkText },
+                        (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
                       ),
                     );
                   })
                 }
               >
                 {t("buildPdf")}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!!busy}
+                onClick={() =>
+                  run(t("processing"), async () => {
+                    const built =
+                      pdf ??
+                      (await exportPdf(
+                        pages,
+                        { quality, pageSize: size, layout, pageNumbers, watermarkText },
+                        (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
+                      ));
+                    const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result as ArrayBuffer);
+                      reader.onerror = () => reject(reader.error);
+                      reader.readAsArrayBuffer(built);
+                    });
+                    setPendingSignPdf(safeFilename(doc.name), new Uint8Array(buf));
+                    await navigate({ to: "/sign" });
+                  })
+                }
+              >
+                <FileSignature />
+                {t("signThisPdf")}
               </Button>
               {pdf && (
                 <>
@@ -359,6 +605,10 @@ function DocPage() {
         <PageEditor
           page={editing}
           onClose={() => setEditing(null)}
+          onApplyAll={async (filter) => {
+            await applyFilterToAllPages(doc.id, filter);
+            await load();
+          }}
           onSave={async (settings) => {
             const out = await renderOutputs(editing.original, settings);
             await putPage({ ...editing, ...out, settings });

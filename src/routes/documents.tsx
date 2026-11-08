@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FileText, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Combine, FileText, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -14,9 +14,9 @@ import {
   requestPersistence,
   type DocRecord,
 } from "@/lib/db";
-import { defaultDocName } from "@/lib/docOps";
+import { defaultDocName, mergeDocuments } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
 
 export const Route = createFileRoute("/documents")({
   head: () => ({
@@ -40,6 +40,14 @@ export const Route = createFileRoute("/documents")({
 
 type DocWithThumb = DocRecord & { thumb?: string | undefined };
 
+const CATEGORIES: [string, TKey][] = [
+  ["all", "catAll"],
+  ["contracts", "catContracts"],
+  ["invoices", "catInvoices"],
+  ["ids", "catIds"],
+  ["signed", "catSigned"],
+];
+
 function DocumentsPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
@@ -47,9 +55,13 @@ function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<DocumentSort>("newest");
+  const [category, setCategory] = useState("all");
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const visibleDocs = useMemo(
-    () => filterDocuments(docs ?? [], query, sort, lang),
-    [docs, query, sort, lang],
+    () => filterDocuments(docs ?? [], query, sort, lang, category),
+    [docs, query, sort, lang, category],
   );
 
   const load = useCallback(async () => {
@@ -92,6 +104,19 @@ function DocumentsPage() {
     }
   }
 
+  async function handleMerge() {
+    if (selectedIds.length < 2) return;
+    try {
+      const merged = await mergeDocuments(selectedIds, defaultDocName(t("untitled"), lang));
+      toast.success(t("mergedSuccess"));
+      setMergeMode(false);
+      setSelectedIds([]);
+      await navigate({ to: "/doc/$id", params: { id: merged.id } });
+    } catch (e) {
+      toast.error(t(errorKey(e)));
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <AppHeader />
@@ -99,10 +124,29 @@ function DocumentsPage() {
         <PageHeading
           title={t("myDocs")}
           action={
-            <Button onClick={newEmpty}>
-              <Plus />
-              {t("newDoc")}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {docs && docs.length > 1 && (
+                <Button
+                  variant={mergeMode ? "secondary" : "outline"}
+                  onClick={() => {
+                    setMergeMode((m) => !m);
+                    setSelectedIds([]);
+                  }}
+                >
+                  <Combine />
+                  {t(mergeMode ? "cancelMerge" : "mergeDocs")}
+                </Button>
+              )}
+              {mergeMode && selectedIds.length >= 2 && (
+                <Button onClick={() => void handleMerge()}>
+                  {t("mergeSelected")} ({selectedIds.length})
+                </Button>
+              )}
+              <Button onClick={newEmpty}>
+                <Plus />
+                {t("newDoc")}
+              </Button>
+            </div>
           }
         >
           <span className="inline-flex items-center gap-2">
@@ -110,6 +154,19 @@ function DocumentsPage() {
             {docs && <span className="text-primary">· {docs.length}</span>}
           </span>
         </PageHeading>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {CATEGORIES.map(([catKey, labelKey]) => (
+            <button
+              key={catKey}
+              type="button"
+              className="chip text-xs"
+              aria-pressed={category === catKey}
+              onClick={() => setCategory(catKey)}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
         <div className="mb-6 flex flex-wrap gap-3">
           <div className="relative min-w-0 flex-1 basis-48">
             <Search className="pointer-events-none absolute start-3 top-3 size-4 text-muted-foreground" />
@@ -160,48 +217,74 @@ function DocumentsPage() {
         {!!docs?.length && visibleDocs.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-muted-foreground">{t("noResults")}</p>
-            <Button variant="ghost" className="mt-3" onClick={() => setQuery("")}>
+            <Button
+              variant="ghost"
+              className="mt-3"
+              onClick={() => {
+                setQuery("");
+                setCategory("all");
+              }}
+            >
               {t("clearSearch")}
             </Button>
           </div>
         )}
         {!!docs?.length && (
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {visibleDocs.map((d) => (
-              <li
-                key={d.id}
-                className="group overflow-hidden rounded-lg border bg-card shadow-paper"
-              >
-                <Link to="/doc/$id" params={{ id: d.id }} className="block" aria-label={d.name}>
-                  <div className="aspect-[3/4] bg-muted">
-                    {d.thumb ? (
-                      <img src={d.thumb} alt="" className="size-full object-cover" />
-                    ) : (
-                      <div className="grid size-full place-items-center text-muted-foreground">
-                        <FileText className="size-8" />
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="flex items-start gap-1 p-3">
-                  <Link to="/doc/$id" params={{ id: d.id }} className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{d.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {d.pageIds.length} {t("pages")} ·{" "}
-                      {new Date(d.updatedAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")}
-                    </p>
+            {visibleDocs.map((d) => {
+              const isSelected = selectedIds.includes(d.id);
+              return (
+                <li
+                  key={d.id}
+                  className={`group relative overflow-hidden rounded-lg border bg-card shadow-paper ${
+                    isSelected ? "ring-2 ring-primary" : ""
+                  }`}
+                >
+                  {mergeMode && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() =>
+                        setSelectedIds((prev) =>
+                          prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id],
+                        )
+                      }
+                      className="absolute start-2 top-2 z-10 size-5 accent-primary"
+                    />
+                  )}
+                  <Link to="/doc/$id" params={{ id: d.id }} className="block" aria-label={d.name}>
+                    <div className="aspect-[3/4] bg-muted">
+                      {d.thumb ? (
+                        <img src={d.thumb} alt="" className="size-full object-cover" />
+                      ) : (
+                        <div className="grid size-full place-items-center text-muted-foreground">
+                          <FileText className="size-8" />
+                        </div>
+                      )}
+                    </div>
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("delete")}
-                    onClick={() => remove(d.id)}
-                  >
-                    <Trash2 className="text-destructive" />
-                  </Button>
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-start gap-1 p-3">
+                    <Link to="/doc/$id" params={{ id: d.id }} className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{d.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {d.pageIds.length} {t("pages")} ·{" "}
+                        {new Date(d.updatedAt).toLocaleDateString(
+                          lang === "ar" ? "ar-EG" : "en-GB",
+                        )}
+                      </p>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t("delete")}
+                      onClick={() => remove(d.id)}
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>

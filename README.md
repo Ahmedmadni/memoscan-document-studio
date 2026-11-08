@@ -1,32 +1,46 @@
-# Waraqah — ورقة
+# Waraqah Pro — ورقة (CamScanner & Financial Document Studio Edition)
 
-Waraqah is a privacy-first document workspace for scanning paper documents and signing PDF files, designed for Arabic-first mobile use with an English interface and Android packaging through Capacitor.
+Waraqah is a privacy-first document workspace for scanning paper documents, decoding Saudi ZATCA tax invoices, and signing/stamping PDF files, designed for Arabic-first mobile use with an English interface and Android packaging through Capacitor.
 
 **Tagline:** From paper to a polished file — in seconds.  
 **الشعار:** من الورق إلى ملف جاهز — في ثوانٍ.
 
-## Product priorities
+## Key Capabilities (CamScanner Pro + Financial Edition)
 
-1. A polished, responsive Arabic RTL interface with an Arabic/English language toggle, accessible contrast, mobile-friendly controls, and a coherent design system.
-2. A working scan workflow: import images, capture pages with the in-app camera where supported, preview pages, adjust four corners, rotate, reorder, duplicate, replace, and delete pages.
-3. Real client-side image processing: perspective correction, rotation, grayscale, black-and-white threshold, color enhancement, brightness/contrast, sharpening, and honest communication about automatic edge-detection limitations.
-4. A multi-page document workspace with local persistence (IndexedDB), thumbnails, rename, create/open/delete documents, and graceful empty/loading/error states.
-5. Multi-page PDF export with quality options, download/share support and fallbacks. User documents must not be uploaded to a server.
-6. A clear in-app privacy note explaining local processing and storage. Do not seed fake documents or fabricate results.
-7. A unified Scan + Sign experience: scan images into PDFs, import existing PDFs, place a visual signature, and export a signed copy while preserving the original.
+1. **Smart Camera & Perspective Studio**:
+   - Live edge detection, 3×3 alignment grid, portrait orientation lock on Android, and batch capture queue.
+   - Precision Magnifier Loupe (`عدسة الدقة`) when dragging the four document corners.
+   - Real client-side homography perspective rectification, mild curved-edge cleanup, rotation, and fine deskew (`-15°..+15°`).
+2. **CamScanner Pro Filters & Batch Processing**:
+   - **Magic Color (`ألوان سحرية`)**, **Clear Text (`نص واضح`)**, **White Paper (`تبييض الورقة`)**, **Paper Shadow Cleanup**, **Enhance**, **Grayscale**, and **Adaptive Black & White**.
+   - **1-Tap Batch Filter** to apply any filter across all pages of a document simultaneously.
+3. **ID Card 2-in-1 A4 Mode & Advanced PDF Export**:
+   - Combine front & back of an ID Card / Iqama / Passport onto a single A4 sheet (`composeIdCardSheet`).
+   - Optional automatic page numbering (`1 / N`) and diagonal security watermark.
+   - Direct **"Sign this PDF" (`توقيع هذا الـ PDF`)** handoff from the scanner workspace straight into the signing studio.
+4. **Signature, Official Stamp & Multi-Overlay Studio**:
+   - Draw signatures in multiple official ink colors (Official Blue `#142b55`, Black, Red, Green) with adjustable pen thickness.
+   - **Auto Paper Background Eraser**: import a photographed signature from the gallery and automatically strip the paper background into transparent ink.
+   - **Official Electronic Stamps (`أختام رسمية`)**: generate dual-language stamps (`APPROVED / معتمد`, `CERTIFIED COPY / نسخة طبق الأصل`, `CONFIDENTIAL / سري للغاية`, `REVIEWED / تمت المراجعة`) + Date Stamps.
+   - **Multi-Overlay Pinning & Opacity**: pin multiple stamps and signatures onto the same PDF page with adjustable ink opacity (`30%..100%`) and local **Signature Vault** persistence.
+5. **Saudi ZATCA Tax Invoice QR Decoder & Document Library**:
+   - Built-in TLV Base64 decoder & formatter (`src/lib/zatca.ts`) for Saudi e-Invoicing (ZATCA / الفوترة الإلكترونية) extracting Seller Name, 15-digit VAT Number, Timestamp, Total with VAT, and 15% VAT Amount into searchable document notes.
+   - Smart categories (`عقود`, `فواتير`, `هويات`, `موقّعة`), multi-document merging (`دمج المستندات`), Dark Mode (`الوضع الداكن`), and JSON metadata backup export.
 
-## Scan + Sign roadmap
+## Syncing to GitHub & Building Android APK
 
-See [ROADMAP-SCAN-AND-SIGN.md](./ROADMAP-SCAN-AND-SIGN.md) for the product architecture, phased implementation plan, acceptance criteria, privacy requirements, and release checklist. The planned signing MVP embeds a visual signature; it is not a certificate-backed cryptographic digital signature.
+Run the bundled sync script from the project root:
 
-## Engineering
+```bash
+bash sync-to-github.sh
+```
 
-- Keep the code maintainable and browser-compatible with Capacitor.
-- Document any native Android capabilities requiring a Capacitor plugin or native implementation.
-- Do not claim tests passed unless actually run. Report verified build/test results and remaining limitations accurately.
+Or on Windows:
 
-## Development
+```cmd
+sync-to-github.bat
+```
 
-This project was built with Lovable. Continue development in the Lovable editor at https://lovable.dev/projects/699316fb-b881-46d8-a4a8-1701c1d40419.
-
-The Android application ID remains com.ahmedelmadni.memoscan intentionally. Keeping the ID unchanged allows the rebranded build to retain the same Android package identity; the display name is now Waraqah.
+Pushing to `main` triggers `.github/workflows/android-debug-apk.yml`, which runs all Vitest suites, ESLint, builds the SPA shell, syncs Capacitor (`com.ahmedelmadni.memoscan`), and uploads both:
+- `waraqah-android-debug-apk` (`app-debug.apk`)
+- `waraqah-android-release-apk` (`waraqah-release-signed.apk`)

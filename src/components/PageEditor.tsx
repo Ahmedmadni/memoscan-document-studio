@@ -21,6 +21,7 @@ import {
 
 const FILTERS: [FilterMode, TKey][] = [
   ["original", "fOriginal"],
+  ["magic", "fMagic"],
   ["enhance", "fEnhance"],
   ["gray", "fGray"],
   ["bw", "fBw"],
@@ -32,10 +33,12 @@ const FILTERS: [FilterMode, TKey][] = [
 export function PageEditor({
   page,
   onSave,
+  onApplyAll,
   onClose,
 }: {
   page: PageRecord;
   onSave: (s: EditSettings) => Promise<void>;
+  onApplyAll?: ((filter: FilterMode) => Promise<void>) | undefined;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -52,6 +55,7 @@ export function PageEditor({
   const [before, setBefore] = useState("");
   const [split, setSplit] = useState(50);
   const [saving, setSaving] = useState(false);
+  const [activeDragIdx, setActiveDragIdx] = useState<number | null>(null);
   const s = hist.present;
 
   useEffect(() => {
@@ -171,6 +175,8 @@ export function PageEditor({
     </label>
   );
 
+  const activeCornerPt = activeDragIdx !== null ? s.corners[activeDragIdx] : null;
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       <div className="flex items-center gap-1 border-b px-3 py-2">
@@ -216,7 +222,7 @@ export function PageEditor({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-stage p-4" dir="ltr">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-stage p-4" dir="ltr">
         {!src && <Loader2 className="size-8 animate-spin text-stage-foreground" />}
         {src && tab === "corners" && (
           <div ref={box} className="relative touch-none select-none">
@@ -244,11 +250,29 @@ export function PageEditor({
                 onPointerDown={(e) => {
                   (e.target as HTMLElement).setPointerCapture(e.pointerId);
                   last.current = { key: "", time: 0 };
+                  setActiveDragIdx(i);
                 }}
                 onPointerMove={(e) => e.buttons && drag(i, e)}
+                onPointerUp={() => setActiveDragIdx(null)}
+                onPointerCancel={() => setActiveDragIdx(null)}
                 onKeyDown={(e) => nudge(i, e)}
               />
             ))}
+            {activeCornerPt && (
+              <div
+                aria-label={t("loupeLabel")}
+                className="pointer-events-none absolute top-2 start-2 size-24 overflow-hidden rounded-full border-2 border-handle bg-stage shadow-lg"
+                style={{
+                  backgroundImage: `url(${srcUrl})`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "300% 300%",
+                  backgroundPosition: `${activeCornerPt.x * 100}% ${activeCornerPt.y * 100}%`,
+                }}
+              >
+                <div className="absolute inset-x-0 top-1/2 h-px bg-handle/80" />
+                <div className="absolute inset-y-0 left-1/2 w-px bg-handle/80" />
+              </div>
+            )}
           </div>
         )}
         {src && tab === "adjust" && after && (
@@ -324,6 +348,24 @@ export function PageEditor({
               >
                 <RotateCw />
               </Button>
+              {onApplyAll && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={saving}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      await onApplyAll(s.filter);
+                      toast.success(t("appliedToAll"));
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {t("applyToAllPagesBtn")}
+                </Button>
+              )}
             </div>
             <div className="space-y-1 sm:col-span-2">
               <label className="flex items-center justify-between gap-3 text-sm">
