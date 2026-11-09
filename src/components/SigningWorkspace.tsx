@@ -554,65 +554,67 @@ export function SigningWorkspace() {
         )}
 
         {signature && (
-          <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4 shadow-paper">
-            <span className="text-sm font-medium">{t("signPreview")}</span>
+          <section className="mb-6 space-y-3 rounded-2xl border bg-card p-4 shadow-paper">
+            <h2 className="text-sm font-semibold">{t("signPreview")}</h2>
             <img
               src={signature.data}
               alt={t("signPreview")}
-              className="h-16 max-w-56 rounded bg-white object-contain"
+              className="block h-auto max-h-[min(50dvh,28rem)] w-full rounded-lg border bg-white object-contain p-2"
             />
-            <Button
-              disabled={disabled}
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const updated = saveSignatureToVault(
-                  mode === "stamp" ? stampHolder || "Stamp" : "Signature",
-                  signature,
-                );
-                setVault(updated);
-                toast.success(t("saved"));
-              }}
-            >
-              <BookmarkPlus className="me-1 size-4" />
-              {t("saveToVault")}
-            </Button>
-            {pdf && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 disabled={disabled}
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 onClick={() => {
-                  setPinned((prev) => [
-                    ...prev,
-                    {
-                      id: `${Date.now()}-${prev.length}`,
-                      signature,
-                      pageIndex,
-                      placement: safe,
-                      opacity,
-                    },
-                  ]);
-                  setPlacement({
-                    x: Math.min(0.7, safe.x + 0.06),
-                    y: Math.min(0.8, safe.y + 0.06),
-                    width: safe.width,
-                  });
+                  const updated = saveSignatureToVault(
+                    mode === "stamp" ? stampHolder || "Stamp" : "Signature",
+                    signature,
+                  );
+                  setVault(updated);
                   toast.success(t("saved"));
                 }}
               >
-                <Pin className="me-1 size-4" />
-                {t("pinOverlay")}
+                <BookmarkPlus className="me-1 size-4" />
+                {t("saveToVault")}
               </Button>
-            )}
-            <Button
-              disabled={disabled}
-              variant="ghost"
-              size="sm"
-              onClick={() => setSignature(null)}
-            >
-              {t("remove")}
-            </Button>
+              {pdf && (
+                <Button
+                  disabled={disabled}
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setPinned((prev) => [
+                      ...prev,
+                      {
+                        id: `${Date.now()}-${prev.length}`,
+                        signature,
+                        pageIndex,
+                        placement: safe,
+                        opacity,
+                      },
+                    ]);
+                    setPlacement({
+                      x: Math.min(0.7, safe.x + 0.06),
+                      y: Math.min(0.8, safe.y + 0.06),
+                      width: safe.width,
+                    });
+                    toast.success(t("saved"));
+                  }}
+                >
+                  <Pin className="me-1 size-4" />
+                  {t("pinOverlay")}
+                </Button>
+              )}
+              <Button
+                disabled={disabled}
+                variant="ghost"
+                size="sm"
+                onClick={() => setSignature(null)}
+              >
+                {t("remove")}
+              </Button>
+            </div>
           </section>
         )}
 
