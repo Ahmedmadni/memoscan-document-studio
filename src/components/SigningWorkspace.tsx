@@ -49,6 +49,23 @@ const INK_COLORS = [
   { id: "green", value: "#15803d", labelKey: "inkGreen" as const },
 ];
 
+type InkPoint = { x: number; y: number };
+
+type InkStroke = {
+  canvas: HTMLCanvasElement;
+  pointerId: number;
+  last: InkPoint;
+  end: InkPoint;
+  minDistance: number;
+};
+
+function inkPoint(event: PointerEvent, canvas: HTMLCanvasElement, bounds: DOMRect): InkPoint {
+  return {
+    x: ((event.clientX - bounds.left) * canvas.width) / bounds.width,
+    y: ((event.clientY - bounds.top) * canvas.height) / bounds.height,
+  };
+}
+
 export function SigningWorkspace() {
   const { t } = useI18n();
   const [pdf, setPdf] = useState<{ name: string; bytes: Uint8Array; pages: PageGeometry[] } | null>(
@@ -78,7 +95,7 @@ export function SigningWorkspace() {
   const previewRef = useRef<HTMLCanvasElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
-  const drawing = useRef(false);
+  const drawing = useRef<InkStroke | null>(null);
   const drag = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const revision = useRef({ pdf: 0, image: 0 });
   const page = pdf?.pages[pageIndex];
@@ -162,49 +179,95 @@ export function SigningWorkspace() {
     }
   }
 
-  function startDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+  function clearDrawing() {
+    drawing.current = null;
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    canvas.setPointerCapture(e.pointerId);
-    drawing.current = true;
-    const r = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(
-      ((e.clientX - r.left) * canvas.width) / r.width,
-      ((e.clientY - r.top) * canvas.height) / r.height,
-    );
-    ctx.lineWidth = penWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle =
-      inkColor || getComputedStyle(canvas).getPropertyValue("--signature-ink").trim();
+    if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    setSignature(null);
     setError(null);
   }
-  function moveDraw(e: React.PointerEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!drawing.current || !canvas || !ctx) return;
-    const r = canvas.getBoundingClientRect();
-    ctx.lineTo(
-      ((e.clientX - r.left) * canvas.width) / r.width,
-      ((e.clientY - r.top) * canvas.height) / r.height,
-    );
-    ctx.stroke();
+
+  function startDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = e.currentTarget;
+    if (e.button !== 0 || drawing.current?.canvas === canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    const ctx = canvas.getContext("2d");
+    if (!ctx || !bounds.width || !bounds.height) return;
+
+    const point = inkPoint(e.nativeEvent, canvas, bounds);
+    const scale = canvas.width / bounds.width;
+    drawing.current = {
+      canvas,
+      pointerId: e.pointerId,
+      last: point,
+      end: point,
+      minDistance: 1.25 * scale,
+    };
+    canvas.setPointerCapture?.(e.pointerId);
+    ctx.lineWidth = penWidth * scale;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = inkColor;
+    ctx.fillStyle = inkColor;
+    setError(null);
   }
-  function endDraw() {
-    if (!drawing.current) return;
-    drawing.current = false;
-    const c = canvasRef.current;
-    const ctx = c?.getContext("2d");
-    if (!c || !ctx) return;
-    if (!hasSignatureInk(ctx.getImageData(0, 0, c.width, c.height).data)) {
+
+  function moveDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+    const stroke = drawing.current;
+    const canvas = e.currentTarget;
+    if (!stroke || stroke.pointerId !== e.pointerId || stroke.canvas !== canvas) return;
+    const ctx = canvas.getContext("2d");
+    const bounds = canvas.getBoundingClientRect();
+    if (!ctx || !bounds.width || !bounds.height) return;
+
+    const event = e.nativeEvent;
+    const coalesced = event.getCoalescedEvents?.();
+    const samples = coalesced?.length ? coalesced : [event];
+    const previous = stroke.last;
+    ctx.beginPath();
+    ctx.moveTo(stroke.end.x, stroke.end.y);
+    for (const sample of samples) {
+      const point = inkPoint(sample, canvas, bounds);
+      if (Math.hypot(point.x - stroke.last.x, point.y - stroke.last.y) < stroke.minDistance) {
+        continue;
+      }
+      // Midpoints between samples keep the slope continuous at segment joins.
+      const midpoint = { x: (stroke.last.x + point.x) / 2, y: (stroke.last.y + point.y) / 2 };
+      ctx.quadraticCurveTo(stroke.last.x, stroke.last.y, midpoint.x, midpoint.y);
+      stroke.last = point;
+      stroke.end = midpoint;
+    }
+    if (stroke.last !== previous) ctx.stroke();
+  }
+
+  function endDraw(e: React.PointerEvent<HTMLCanvasElement>) {
+    const stroke = drawing.current;
+    const canvas = e.currentTarget;
+    if (!stroke || stroke.pointerId !== e.pointerId || stroke.canvas !== canvas) return;
+    if (e.type === "pointerup") moveDraw(e);
+    drawing.current = null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || (stroke.last === stroke.end && e.type !== "pointerup")) return;
+
+    ctx.beginPath();
+    if (stroke.last === stroke.end) {
+      // A tap is a dot, which is needed for many Arabic signatures.
+      ctx.arc(stroke.last.x, stroke.last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.moveTo(stroke.end.x, stroke.end.y);
+      ctx.lineTo(stroke.last.x, stroke.last.y);
+      ctx.stroke();
+    }
+
+    if (!hasSignatureInk(ctx.getImageData(0, 0, canvas.width, canvas.height).data)) {
       setSignature(null);
       setError(t("signBlank"));
       return;
     }
-    setSignature({ data: c.toDataURL("image/png"), aspect: c.height / c.width });
+    setSignature({ data: canvas.toDataURL("image/png"), aspect: canvas.height / canvas.width });
   }
+
   async function exportPdf() {
     if (!pdf || (!signature && !pinned.length) || preview !== "ready" || importing) return;
     setBusy(true);
@@ -315,10 +378,7 @@ export function SigningWorkspace() {
                 variant={mode === "draw" ? "default" : "outline"}
                 onClick={() => {
                   setMode("draw");
-                  setSignature(null);
-                  const canvas = canvasRef.current;
-                  if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-                  setError(null);
+                  clearDrawing();
                 }}
               >
                 <FileSignature className="me-2 size-4" />
@@ -417,17 +477,7 @@ export function SigningWorkspace() {
                     className="w-20 accent-primary"
                   />
                 </label>
-                <Button
-                  disabled={disabled}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const c = canvasRef.current;
-                    if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
-                    setSignature(null);
-                    setError(null);
-                  }}
-                >
+                <Button disabled={disabled} size="sm" variant="ghost" onClick={clearDrawing}>
                   <Eraser className="me-2 size-4" />
                   {t("clear")}
                 </Button>
@@ -436,13 +486,14 @@ export function SigningWorkspace() {
             <canvas
               ref={canvasRef}
               aria-label={t("signBox")}
-              width={900}
-              height={220}
-              className="h-44 w-full touch-none rounded-xl border bg-background"
+              width={1152}
+              height={576}
+              className="mx-auto block h-auto w-full max-w-96 touch-none rounded-xl bg-white ring-1 ring-inset ring-border"
               onPointerDown={disabled ? undefined : startDraw}
               onPointerMove={moveDraw}
               onPointerUp={endDraw}
               onPointerCancel={endDraw}
+              onLostPointerCapture={endDraw}
             />
           </section>
         )}
@@ -508,7 +559,7 @@ export function SigningWorkspace() {
             <img
               src={signature.data}
               alt={t("signPreview")}
-              className="h-16 max-w-56 object-contain"
+              className="h-16 max-w-56 rounded bg-white object-contain"
             />
             <Button
               disabled={disabled}

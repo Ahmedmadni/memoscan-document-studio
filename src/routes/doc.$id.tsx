@@ -486,55 +486,68 @@ function DocPage() {
         {pages.length > 0 && (
           <section
             ref={exportSectionRef}
-            className="scroll-mt-4 space-y-4 rounded-2xl border bg-card p-5 shadow-paper"
+            className="scroll-mt-4 space-y-3 rounded-2xl border bg-card p-4 shadow-paper sm:p-5"
           >
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
-            <Choice
-              label={t("quality")}
-              value={quality}
-              onChange={setQuality}
-              options={[
-                ["high", t("qHigh")],
-                ["medium", t("qMedium")],
-                ["small", t("qSmall")],
-              ]}
-            />
-            <Choice
-              label={t("pageSize")}
-              value={size}
-              onChange={setSize}
-              options={[
-                ["fit", t("sizeFit")],
-                ["a4", t("sizeA4")],
-              ]}
-            />
-            <Choice
-              label={t("layoutMode")}
-              value={layout}
-              onChange={setLayout}
-              options={[
-                ["standard", t("layoutStandard")],
-                ["id-card", t("layoutIdCard")],
-              ]}
-            />
-            <div className="flex flex-wrap items-center gap-6 text-sm">
-              <label className="inline-flex items-center gap-2">
-                <Switch
-                  aria-label={t("pageNumbers")}
-                  checked={pageNumbers}
-                  onCheckedChange={setPageNumbers}
-                />
-                <span>{t("pageNumbers")}</span>
-              </label>
-              <input
-                value={watermarkText}
-                onChange={(e) => setWatermarkText(e.target.value)}
-                placeholder={t("watermarkLabel")}
-                className="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <ExportSelect
+                label={t("quality")}
+                value={quality}
+                onChange={setQuality}
+                options={[
+                  ["high", t("qHigh")],
+                  ["medium", t("qMedium")],
+                  ["small", t("qSmall")],
+                ]}
+              />
+              <ExportSelect
+                label={t("pageSize")}
+                value={layout === "id-card" ? "a4" : size}
+                onChange={setSize}
+                disabled={layout === "id-card"}
+                options={[
+                  ["fit", t("sizeFit")],
+                  ["a4", t("sizeA4")],
+                ]}
+              />
+              <ExportSelect
+                label={t("layoutMode")}
+                value={layout}
+                onChange={setLayout}
+                className="col-span-2 sm:col-span-1"
+                options={[
+                  ["standard", t("layoutStandard")],
+                  ["id-card", t("layoutIdCard")],
+                ]}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2 pt-2">
+            <details className="rounded-lg border bg-background px-3 py-2">
+              <summary className="cursor-pointer text-sm font-medium">
+                {t("exportMoreOptions")}
+              </summary>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                <label className="inline-flex min-h-9 items-center gap-2">
+                  <Switch
+                    aria-label={t("pageNumbers")}
+                    checked={pageNumbers}
+                    onCheckedChange={setPageNumbers}
+                  />
+                  <span>{t("pageNumbers")}</span>
+                </label>
+                {layout === "standard" && (
+                  <input
+                    value={watermarkText}
+                    onChange={(e) => setWatermarkText(e.target.value)}
+                    aria-label={t("watermarkLabel")}
+                    placeholder={t("watermarkLabel")}
+                    className="h-9 min-w-36 flex-1 rounded-md border bg-card px-3 text-sm"
+                  />
+                )}
+              </div>
+            </details>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <Button
+                className="h-auto min-h-10 whitespace-normal px-2 sm:px-4"
                 disabled={!!busy}
                 onClick={() =>
                   run(t("processing"), async () => {
@@ -552,47 +565,48 @@ function DocPage() {
               </Button>
               <Button
                 variant="secondary"
+                className="h-auto min-h-10 whitespace-normal px-2 sm:px-4"
                 disabled={!!busy}
                 onClick={() => void triggerSignHandoff()}
               >
                 <FileSignature />
                 {t("signThisPdf")}
               </Button>
-              {pdf && (
-                <>
-                  <span className="text-sm font-medium text-success">
-                    {t("pdfReady")} · {formatBytes(pdf.size)}
-                  </span>
-                  {!isNative() && (
-                    <Button
-                      variant="outline"
-                      onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
-                    >
-                      <Download />
-                      {t("download")}
-                    </Button>
-                  )}
+            </div>
+            {pdf && (
+              <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                <span className="me-auto text-sm font-medium text-success">
+                  {t("pdfReady")} · {formatBytes(pdf.size)}
+                </span>
+                {!isNative() && (
                   <Button
                     variant="outline"
-                    onClick={async () => {
-                      const fn = safeFilename(doc.name);
-                      if (!canShareFile(pdf, fn)) {
-                        toast.info(t("shareUnavailable"));
-                        return;
-                      }
-                      try {
-                        if ((await shareFile(pdf, fn)) === "shared") toast.success(t("shared"));
-                      } catch {
-                        toast.error(t("shareUnavailable"));
-                      }
-                    }}
+                    onClick={() => downloadBlob(pdf, safeFilename(doc.name))}
                   >
-                    <Share2 />
-                    {t("share")}
+                    <Download />
+                    {t("download")}
                   </Button>
-                </>
-              )}
-            </div>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const fn = safeFilename(doc.name);
+                    if (!canShareFile(pdf, fn)) {
+                      toast.info(t("shareUnavailable"));
+                      return;
+                    }
+                    try {
+                      if ((await shareFile(pdf, fn)) === "shared") toast.success(t("shared"));
+                    } catch {
+                      toast.error(t("shareUnavailable"));
+                    }
+                  }}
+                >
+                  <Share2 />
+                  {t("share")}
+                </Button>
+              </div>
+            )}
           </section>
         )}
       </main>
@@ -726,25 +740,36 @@ function IconBtn({
   );
 }
 
-function Choice<T extends string>({
+function ExportSelect<T extends string>({
   label,
   value,
   onChange,
   options,
+  disabled,
+  className = "",
 }: {
   label: string;
   value: T;
-  onChange: (v: T) => void;
+  onChange: (value: T) => void;
   options: [T, string][];
+  disabled?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="w-28 text-muted-foreground">{label}</span>
-      {options.map(([v, l]) => (
-        <button key={v} className="chip" aria-pressed={value === v} onClick={() => onChange(v)}>
-          {l}
-        </button>
-      ))}
-    </div>
+    <label className={`grid min-w-0 gap-1 text-sm ${className}`}>
+      <span className="text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="h-10 min-w-0 w-full rounded-lg border bg-background px-2 font-medium focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+      >
+        {options.map(([key, text]) => (
+          <option key={key} value={key}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

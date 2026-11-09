@@ -282,6 +282,7 @@ const dict = {
     ar: "لم تُكتشف الحواف — اضبطها يدويًا",
     en: "Edges not detected — adjust manually",
   },
+  exportMoreOptions: { ar: "خيارات إضافية", en: "More options" },
   exportTitle: { ar: "تصدير PDF", en: "Export PDF" },
   quality: { ar: "الجودة", en: "Quality" },
   qHigh: { ar: "عالية", en: "High" },

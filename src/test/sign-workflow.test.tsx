@@ -17,6 +17,7 @@ vi.mock("@/lib/signature-preview", () => ({
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 function setup(en = false) {
   if (en) localStorage.setItem("waraqah.lang", "en");
@@ -72,4 +73,68 @@ describe("signing UI states", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("PNG or JPG"));
     expect(screen.getByRole("button", { name: "Choose PDF" })).toBeEnabled();
   });
+});
+
+it("smooths pointer samples, preserves the stroke endpoint, and supports dots", () => {
+  const ctx = {
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    getImageData: vi.fn(() => ({ data: new Uint8ClampedArray([20, 43, 85, 255]) })),
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+    ctx as unknown as CanvasRenderingContext2D,
+  );
+  const png = "data:image/png;base64,dGVzdA==";
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(png);
+  setup(true);
+
+  const canvas = screen.getByLabelText("Draw in the box");
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 384,
+    height: 192,
+  } as DOMRect);
+
+  function send(
+    type: string,
+    x: number,
+    y: number,
+    samples: { clientX: number; clientY: number }[] = [],
+  ) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y });
+    Object.defineProperties(event, {
+      pointerId: { value: 1 },
+      getCoalescedEvents: { value: () => samples },
+    });
+    fireEvent(canvas, event);
+  }
+
+  send("pointerdown", 10, 10);
+  send("pointermove", 24, 28, [
+    { clientX: 10.2, clientY: 10.1 },
+    { clientX: 22, clientY: 16 },
+    { clientX: 24, clientY: 28 },
+  ]);
+  send("pointerup", 26, 29);
+
+  expect(ctx.quadraticCurveTo.mock.calls).toEqual([
+    [30, 30, 48, 39],
+    [66, 48, 69, 66],
+    [72, 84, 75, 85.5],
+  ]);
+  expect(ctx.lineTo).toHaveBeenCalledExactlyOnceWith(78, 87);
+  expect(screen.getByRole("img", { name: "Signature preview" })).toHaveAttribute("src", png);
+
+  send("pointerdown", 30, 30);
+  send("pointerup", 30, 30);
+  expect(ctx.arc).toHaveBeenCalledExactlyOnceWith(90, 90, 5.25, 0, Math.PI * 2);
+  send("pointerdown", 32, 32);
+  send("pointercancel", 0, 0);
+  expect(ctx.fill).toHaveBeenCalledOnce();
 });
