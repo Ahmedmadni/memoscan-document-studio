@@ -58,8 +58,8 @@ describe("signing UI states", () => {
     fireEvent.change(screen.getByLabelText("Choose PDF"), { target: { files: [file] } });
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Couldn’t open"));
     await uploadPdf("Choose PDF");
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-    expect(screen.getByRole("button", { name: "example.pdf" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "example.pdf" })).toBeEnabled();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
   it("ignores cancelled imports and rejects unsupported images", async () => {
     setup(true);
