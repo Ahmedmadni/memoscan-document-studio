@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowUpLeft,
+  Camera,
   CreditCard,
   FileSignature,
   FileText,
+  FolderOpen,
   QrCode,
   ScanLine,
   ShieldCheck,
@@ -43,7 +45,7 @@ function Home() {
     void listDocs()
       .then(async (docs) =>
         Promise.all(
-          docs.slice(0, 3).map(async (doc) => ({
+          docs.slice(0, 6).map(async (doc) => ({
             ...doc,
             thumb: doc.pageIds[0] ? (await getPage(doc.pageIds[0]))?.thumb : undefined,
           })),
@@ -60,42 +62,82 @@ function Home() {
   return (
     <div className="min-h-screen">
       <AppHeader />
-      <main className="mx-auto max-w-6xl px-5 pb-12">
-        <section className="workspace-cover relative -mx-5 overflow-hidden border-b md:mx-0 md:mt-6">
-          <img
-            src={workspaceImage}
-            alt=""
-            width={1536}
-            height={1024}
-            className="absolute inset-0 size-full object-cover"
-          />
-          <div className="workspace-copy relative flex h-full max-w-xl flex-col justify-center px-6 py-8 md:px-10">
-            <p className="mb-4 text-xs font-semibold text-primary">{t("workspaceLabel")}</p>
-            <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
-              {t("appName")}
-              <span className="ms-3 inline-block size-2 rounded-full bg-accent" />
-            </h1>
-            <p className="mt-3 text-base font-medium text-foreground md:text-lg">
-              {t("homeSubtitle")}
-            </p>
-            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="size-4 text-primary" />
-              {t("privacyShort")}
-            </p>
+      <main className="mx-auto max-w-6xl px-5 pb-20">
+        {/* CamScanner-Style Top Smart Tool Matrix */}
+        <section className="pt-5">
+          <div className="rounded-2xl border bg-card p-4 shadow-paper">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-semibold text-primary">{t("quickModesTitle")}</span>
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <ShieldCheck className="size-3.5 text-primary" />
+                {t("privacyShort")}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <Link
+                to="/scan"
+                className="flex flex-col items-center gap-2 rounded-xl p-2.5 text-center transition-colors hover:bg-secondary/60"
+              >
+                <span className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+                  <Camera className="size-6" />
+                </span>
+                <span className="text-xs font-semibold leading-tight">{t("modeStandardDoc")}</span>
+              </Link>
+              <Link
+                to="/scan"
+                className="flex flex-col items-center gap-2 rounded-xl p-2.5 text-center transition-colors hover:bg-secondary/60"
+              >
+                <span className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">
+                  <CreditCard className="size-6" />
+                </span>
+                <span className="text-xs font-semibold leading-tight">{t("modeIdCard2in1")}</span>
+              </Link>
+              <Link
+                to="/sign"
+                className="flex flex-col items-center gap-2 rounded-xl p-2.5 text-center transition-colors hover:bg-secondary/60"
+              >
+                <span className="grid size-12 place-items-center rounded-2xl bg-signature-soft text-signature">
+                  <Stamp className="size-6" />
+                </span>
+                <span className="text-xs font-semibold leading-tight">
+                  {t("modeOfficialStamp")}
+                </span>
+              </Link>
+              <Link
+                to="/invoices"
+                className="flex flex-col items-center gap-2 rounded-xl p-2.5 text-center transition-colors hover:bg-secondary/60"
+              >
+                <span className="grid size-12 place-items-center rounded-2xl bg-amber-500/15 text-amber-700">
+                  <QrCode className="size-6" />
+                </span>
+                <span className="text-xs font-semibold leading-tight">{t("modeZatcaInvoice")}</span>
+              </Link>
+              <Link
+                to="/documents"
+                className="flex flex-col items-center gap-2 rounded-xl p-2.5 text-center transition-colors hover:bg-secondary/60"
+              >
+                <span className="grid size-12 place-items-center rounded-2xl bg-muted text-foreground">
+                  <FolderOpen className="size-6" />
+                </span>
+                <span className="text-xs font-semibold leading-tight">{t("navDocuments")}</span>
+              </Link>
+            </div>
           </div>
         </section>
-        <section className="py-7 md:py-9">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">{t("startWorkspace")}</h2>
+
+        {/* Primary Dual Workflows */}
+        <section className="py-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">{t("startWorkspace")}</h2>
             <span className="text-xs text-muted-foreground">01 — 02</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Button
               asChild
-              className="workflow-action workflow-scan h-auto justify-start whitespace-normal rounded-lg border p-5 text-start shadow-none md:p-6"
+              className="workflow-action workflow-scan h-auto justify-start whitespace-normal rounded-xl border p-5 text-start shadow-none"
             >
               <Link to="/scan">
-                <span className="workflow-icon grid size-12 shrink-0 place-items-center rounded-md">
+                <span className="workflow-icon grid size-12 shrink-0 place-items-center rounded-xl">
                   <ScanLine className="size-6" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -108,10 +150,10 @@ function Home() {
             <Button
               asChild
               variant="outline"
-              className="workflow-action h-auto justify-start whitespace-normal rounded-lg border bg-card p-5 text-start md:p-6"
+              className="workflow-action h-auto justify-start whitespace-normal rounded-xl border bg-card p-5 text-start"
             >
               <Link to="/sign">
-                <span className="grid size-12 shrink-0 place-items-center rounded-md bg-signature-soft text-signature">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-signature-soft text-signature">
                   <FileSignature className="size-6" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -122,45 +164,12 @@ function Home() {
               </Link>
             </Button>
           </div>
-          <div className="mt-5">
-            <p className="mb-2.5 text-xs font-semibold text-muted-foreground">
-              {t("quickModesTitle")}
-            </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Link
-                to="/scan"
-                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
-              >
-                <ScanLine className="size-4 shrink-0 text-primary" />
-                <span>{t("modeStandardDoc")}</span>
-              </Link>
-              <Link
-                to="/scan"
-                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
-              >
-                <CreditCard className="size-4 shrink-0 text-primary" />
-                <span>{t("modeIdCard2in1")}</span>
-              </Link>
-              <Link
-                to="/invoices"
-                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
-              >
-                <QrCode className="size-4 shrink-0 text-primary" />
-                <span>{t("modeZatcaInvoice")}</span>
-              </Link>
-              <Link
-                to="/sign"
-                className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
-              >
-                <Stamp className="size-4 shrink-0 text-primary" />
-                <span>{t("modeOfficialStamp")}</span>
-              </Link>
-            </div>
-          </div>
         </section>
-        <section className="border-t py-6">
-          <div className="mb-5 flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">{t("recentDocs")}</h2>
+
+        {/* CamScanner-Style Recent Documents Feed */}
+        <section className="border-t pt-5">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">{t("recentDocs")}</h2>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/documents">
                 {t("viewAll")}
@@ -169,23 +178,26 @@ function Home() {
             </Button>
           </div>
           {recent.length ? (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {recent.map((doc) => (
                 <Link
                   key={doc.id}
                   to="/doc/$id"
                   params={{ id: doc.id }}
-                  className="flex min-w-0 items-center gap-4 rounded-lg border bg-card p-3 transition-colors hover:border-primary/50"
+                  className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-card p-3 shadow-paper transition-colors hover:border-primary/50"
                 >
-                  <div className="grid h-16 w-12 shrink-0 place-items-center overflow-hidden rounded border bg-muted">
+                  <div className="relative grid h-16 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border bg-muted">
                     {doc.thumb ? (
                       <img src={doc.thumb} alt="" className="size-full object-cover" />
                     ) : (
                       <FileText className="size-5 text-muted-foreground" />
                     )}
+                    <span className="absolute top-0.5 end-0.5 rounded bg-stage/85 px-1 text-[10px] font-semibold text-stage-foreground">
+                      {doc.pageIds.length}
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{doc.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{doc.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {doc.pageIds.length} {t("pages")} ·{" "}
                       {new Date(doc.updatedAt).toLocaleDateString(
@@ -197,14 +209,28 @@ function Home() {
               ))}
             </div>
           ) : (
-            <div className="flex items-center gap-4 py-5 text-muted-foreground">
-              <span className="grid size-12 place-items-center rounded-lg bg-muted">
-                <FileText className="size-6" />
-              </span>
-              <p className="text-sm">{t("emptyTitle")}</p>
+            <div className="workspace-cover relative overflow-hidden rounded-2xl border">
+              <img
+                src={workspaceImage}
+                alt=""
+                width={1536}
+                height={1024}
+                className="absolute inset-0 size-full object-cover"
+              />
+              <div className="workspace-copy relative flex h-full max-w-xl flex-col justify-center px-6 py-6">
+                <p className="text-xs font-semibold text-primary">{t("workspaceLabel")}</p>
+                <p className="mt-1 text-lg font-bold">{t("emptyTitle")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("emptyBody")}</p>
+              </div>
             </div>
           )}
         </section>
+
+        {/* CamScanner Floating Camera Action Button (FAB) */}
+        <Link to="/scan" className="cs-fab" aria-label={t("scanCamera")}>
+          <Camera className="size-5" />
+          <span>{t("scanCamera")}</span>
+        </Link>
       </main>
     </div>
   );

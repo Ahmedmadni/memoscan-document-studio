@@ -8,7 +8,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  verticalListSortingStrategy,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -22,6 +22,7 @@ import {
   Copy,
   Download,
   FileSignature,
+  FileText,
   GripVertical,
   Loader2,
   Pencil,
@@ -121,6 +122,7 @@ function DocPage() {
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
+  const exportSectionRef = useRef<HTMLElement>(null);
   // Soft deletes awaiting undo or finalization; finalized on unmount.
   const pendingDeletes = useRef<PendingDeletes | null>(null);
   pendingDeletes.current ??= new PendingDeletes(6000);
@@ -239,8 +241,29 @@ function DocPage() {
     setNotes(nextNotes);
   }
 
+  async function triggerSignHandoff() {
+    if (!doc) return;
+    await run(t("processing"), async () => {
+      const built =
+        pdf ??
+        (await exportPdf(
+          pages,
+          { quality, pageSize: size, layout, pageNumbers, watermarkText },
+          (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
+        ));
+      const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(built);
+      });
+      setPendingSignPdf(safeFilename(doc.name), new Uint8Array(buf));
+      await navigate({ to: "/sign" });
+    });
+  }
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-24">
       <AppHeader
         start={
           <Link
@@ -253,31 +276,53 @@ function DocPage() {
         }
       />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-20">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <input
-            aria-label={t("docName")}
-            defaultValue={doc.name}
-            onBlur={(e) => {
-              const name = e.target.value.trim();
-              if (name && name !== doc.name) void run("", () => saveOrder(ids, { ...doc, name }));
-            }}
-            className="min-w-0 flex-1 rounded-lg border-0 bg-transparent font-display text-2xl font-semibold outline-none focus:ring-2 focus:ring-ring"
-          />
-          <select
-            aria-label={t("docCategory")}
-            value={doc.category ?? ""}
-            onChange={(e) => {
-              const val = (e.target.value || undefined) as DocCategory | undefined;
-              void run("", () => saveOrder(ids, { ...doc, category: val }));
-            }}
-            className="h-9 rounded-md border bg-card px-3 text-xs"
-          >
-            <option value="">{t("docCategory")}: —</option>
-            <option value="contracts">{t("catContracts")}</option>
-            <option value="invoices">{t("catInvoices")}</option>
-            <option value="ids">{t("catIds")}</option>
-            <option value="signed">{t("catSigned")}</option>
-          </select>
+        {/* CamScanner Document Header Card */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-paper">
+          <div className="min-w-0 flex-1">
+            <input
+              aria-label={t("docName")}
+              defaultValue={doc.name}
+              onBlur={(e) => {
+                const name = e.target.value.trim();
+                if (name && name !== doc.name) void run("", () => saveOrder(ids, { ...doc, name }));
+              }}
+              className="w-full rounded-lg border-0 bg-transparent font-display text-xl font-bold outline-none focus:ring-2 focus:ring-ring md:text-2xl"
+            />
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {pages.length} {t("pages")} ·{" "}
+              {new Date(doc.updatedAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label={t("docCategory")}
+              value={doc.category ?? ""}
+              onChange={(e) => {
+                const val = (e.target.value || undefined) as DocCategory | undefined;
+                void run("", () => saveOrder(ids, { ...doc, category: val }));
+              }}
+              className="h-9 rounded-lg border bg-background px-3 text-xs font-medium"
+            >
+              <option value="">{t("docCategory")}: —</option>
+              <option value="contracts">{t("catContracts")}</option>
+              <option value="invoices">{t("catInvoices")}</option>
+              <option value="ids">{t("catIds")}</option>
+              <option value="signed">{t("catSigned")}</option>
+            </select>
+            {pages.length > 0 && (
+              <Button
+                size="sm"
+                onClick={() =>
+                  exportSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                aria-label={t("exportTitle")}
+                className="gap-1.5 rounded-lg font-bold"
+              >
+                <FileText className="size-4" />
+                PDF
+              </Button>
+            )}
+          </div>
         </div>
 
         <ImagePickers
@@ -304,14 +349,15 @@ function DocPage() {
         )}
 
         {pages.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+          <p className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">
             {t("noPages")}
           </p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Sparkles className="size-3.5 text-primary" />
+            {/* CamScanner Quick Batch Filter Bar */}
+            <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border bg-card p-3 shadow-paper">
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-primary">
+                <Sparkles className="size-4" />
                 {t("batchFilterLabel")}:
               </span>
               {BATCH_FILTERS.map(([f, labelKey]) => (
@@ -328,7 +374,7 @@ function DocPage() {
                       toast.success(t("appliedToAll"));
                     })
                   }
-                  className="chip text-xs"
+                  className="chip shrink-0 text-xs"
                 >
                   {t(labelKey)}
                 </button>
@@ -336,8 +382,8 @@ function DocPage() {
             </div>
             <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-                <ul className="mx-auto max-w-2xl space-y-4">
+              <SortableContext items={ids} strategy={rectSortingStrategy}>
+                <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {pages.map((p, i) => (
                     <SortablePageCard
                       key={p.id}
@@ -383,7 +429,7 @@ function DocPage() {
         />
 
         {pages.length > 0 && (
-          <section className="space-y-4 border-t pt-6">
+          <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-paper">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">{t("ocrNotesTitle")}</h2>
               <div className="flex flex-wrap gap-2">
@@ -428,8 +474,8 @@ function DocPage() {
                 }
               }}
               placeholder={t("ocrNotesPlaceholder")}
-              rows={4}
-              className="w-full rounded-lg border bg-card p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              rows={3}
+              className="w-full rounded-xl border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
 
             <h2 className="text-sm font-semibold">{t("zatcaTitle")}</h2>
@@ -438,7 +484,10 @@ function DocPage() {
         )}
 
         {pages.length > 0 && (
-          <section className="space-y-4 border-t pt-6">
+          <section
+            ref={exportSectionRef}
+            className="scroll-mt-4 space-y-4 rounded-2xl border bg-card p-5 shadow-paper"
+          >
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
             <Choice
               label={t("quality")}
@@ -481,10 +530,10 @@ function DocPage() {
                 value={watermarkText}
                 onChange={(e) => setWatermarkText(e.target.value)}
                 placeholder={t("watermarkLabel")}
-                className="h-9 min-w-56 rounded-md border bg-card px-3 text-sm"
+                className="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <Button
                 disabled={!!busy}
                 onClick={() =>
@@ -504,32 +553,14 @@ function DocPage() {
               <Button
                 variant="secondary"
                 disabled={!!busy}
-                onClick={() =>
-                  run(t("processing"), async () => {
-                    const built =
-                      pdf ??
-                      (await exportPdf(
-                        pages,
-                        { quality, pageSize: size, layout, pageNumbers, watermarkText },
-                        (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
-                      ));
-                    const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.onload = () => resolve(reader.result as ArrayBuffer);
-                      reader.onerror = () => reject(reader.error);
-                      reader.readAsArrayBuffer(built);
-                    });
-                    setPendingSignPdf(safeFilename(doc.name), new Uint8Array(buf));
-                    await navigate({ to: "/sign" });
-                  })
-                }
+                onClick={() => void triggerSignHandoff()}
               >
                 <FileSignature />
                 {t("signThisPdf")}
               </Button>
               {pdf && (
                 <>
-                  <span className="text-sm text-success">
+                  <span className="text-sm font-medium text-success">
                     {t("pdfReady")} · {formatBytes(pdf.size)}
                   </span>
                   {!isNative() && (
@@ -608,11 +639,12 @@ function SortablePageCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: p.id,
   });
+  const numStr = String(i + 1).padStart(2, "0");
   return (
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`overflow-hidden rounded-xl border bg-card shadow-paper ${
+      className={`overflow-hidden rounded-2xl border bg-card shadow-paper ${
         isDragging ? "z-10 opacity-60 ring-2 ring-primary" : ""
       }`}
     >
@@ -622,9 +654,9 @@ function SortablePageCard({
           onClick={onEdit}
           aria-label={`${t("edit")} ${i + 1}`}
         >
-          <img src={p.thumb} alt="" className="max-h-72 max-w-full object-contain" />
-          <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
-            {i + 1}
+          <img src={p.thumb} alt="" className="max-h-72 max-w-full rounded object-contain" />
+          <span className="absolute start-2 top-2 rounded-md bg-primary px-2 py-0.5 font-mono text-xs font-bold text-primary-foreground shadow">
+            {numStr}
           </span>
         </button>
         <button
@@ -632,12 +664,16 @@ function SortablePageCard({
           {...listeners}
           aria-label={`${t("dragToReorder")} ${i + 1}`}
           title={t("dragToReorder")}
-          className="absolute end-1 top-1 grid size-8 cursor-grab touch-none place-items-center rounded-md bg-stage/80 text-stage-foreground active:cursor-grabbing"
+          className="absolute end-1.5 top-1.5 grid size-8 cursor-grab touch-none place-items-center rounded-md bg-stage/80 text-stage-foreground active:cursor-grabbing"
         >
           <GripVertical className="size-4" />
         </button>
       </div>
-      <p className={`px-2 pt-1 text-[11px] ${p.autoDetected ? "text-success" : "text-warning"}`}>
+      <p
+        className={`px-2.5 pt-1.5 text-[11px] font-medium ${
+          p.autoDetected ? "text-success" : "text-warning"
+        }`}
+      >
         {p.autoDetected ? t("autoBadge") : t("manualBadge")}
       </p>
       <div className="flex flex-wrap justify-center p-1">
@@ -703,7 +739,7 @@ function Choice<T extends string>({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="w-24 text-muted-foreground">{label}</span>
+      <span className="w-28 text-muted-foreground">{label}</span>
       {options.map(([v, l]) => (
         <button key={v} className="chip" aria-pressed={value === v} onClick={() => onChange(v)}>
           {l}

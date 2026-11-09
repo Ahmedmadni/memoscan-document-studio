@@ -1,6 +1,7 @@
 import {
   BookmarkPlus,
   Calendar,
+  CheckCircle2,
   Download,
   Eraser,
   FileSignature,
@@ -239,15 +240,41 @@ export function SigningWorkspace() {
   return (
     <div className="min-h-screen">
       <AppHeader />
-      <main className="mx-auto max-w-6xl px-4 pb-16">
+      <main className="mx-auto max-w-6xl px-4 pb-20">
         <PageHeading title={t("signTitle")} />
+
+        <ol className="mb-6 grid grid-cols-3 gap-2 rounded-2xl border bg-card p-3 text-xs shadow-paper">
+          {[
+            { label: t("signPdf"), done: !!pdf },
+            { label: t("signSource"), done: !!signature || pinned.length > 0 },
+            {
+              label: t("signPlace"),
+              done: preview === "ready" && (!!signature || pinned.length > 0),
+            },
+          ].map(({ label, done }, index, steps) => (
+            <li
+              key={label}
+              aria-current={steps.findIndex((step) => !step.done) === index ? "step" : undefined}
+              className={`flex items-start gap-1.5 font-semibold ${done ? "text-primary" : "text-muted-foreground"}`}
+            >
+              {done ? <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" /> : null}
+              <span>{label}</span>
+            </li>
+          ))}
+        </ol>
+
         {error && (
-          <p role="alert" className="mb-4 text-sm text-destructive">
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+          >
             {error}
           </p>
         )}
-        <section className="mb-6 grid gap-6 border-b pb-6 md:grid-cols-2">
-          <div className="min-w-0">
+
+        {/* Step 1 & Step 2 Cards */}
+        <section className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className="min-w-0 rounded-2xl border bg-card p-4 shadow-paper">
             <h2 className="mb-2 font-semibold">{t("signPdf")}</h2>
             <input
               ref={fileInput}
@@ -271,7 +298,7 @@ export function SigningWorkspace() {
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">{t("signOriginal")}</p>
             {docHash && (
-              <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-primary">
+              <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-primary">
                 <ShieldCheck className="size-3.5 shrink-0" />
                 <span>
                   {t("docSha256Label")}: {docHash.slice(0, 16)}…
@@ -279,7 +306,8 @@ export function SigningWorkspace() {
               </p>
             )}
           </div>
-          <div>
+
+          <div className="rounded-2xl border bg-card p-4 shadow-paper">
             <h2 className="mb-2 font-semibold">{t("signSource")}</h2>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -352,13 +380,15 @@ export function SigningWorkspace() {
             </div>
           </div>
         </section>
+
         {importing && (
           <p role="status" className="mb-4 text-sm">
             {t("loading")}
           </p>
         )}
+
         {mode === "draw" && (
-          <section className="mb-6 border-b pb-6">
+          <section className="mb-6 rounded-2xl border bg-card p-4 shadow-paper">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{t("signBox")}</h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -408,7 +438,7 @@ export function SigningWorkspace() {
               aria-label={t("signBox")}
               width={900}
               height={220}
-              className="h-44 w-full touch-none rounded-lg border bg-card"
+              className="h-44 w-full touch-none rounded-xl border bg-background"
               onPointerDown={disabled ? undefined : startDraw}
               onPointerMove={moveDraw}
               onPointerUp={endDraw}
@@ -416,8 +446,9 @@ export function SigningWorkspace() {
             />
           </section>
         )}
+
         {mode === "stamp" && (
-          <section className="mb-6 grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-3">
+          <section className="mb-6 grid gap-4 rounded-2xl border bg-card p-4 shadow-paper sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 {t("stampType")}
@@ -470,8 +501,9 @@ export function SigningWorkspace() {
             </div>
           </section>
         )}
+
         {signature && (
-          <section className="mb-6 flex flex-wrap items-center gap-4 border-b pb-6">
+          <section className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border bg-card p-4 shadow-paper">
             <span className="text-sm font-medium">{t("signPreview")}</span>
             <img
               src={signature.data}
@@ -532,8 +564,9 @@ export function SigningWorkspace() {
             </Button>
           </section>
         )}
+
         {pinned.length > 0 && (
-          <section className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 text-xs">
+          <section className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-xs">
             <span>
               {t("pinnedOverlays")}: <strong>{pinned.length}</strong>
             </span>
@@ -542,8 +575,9 @@ export function SigningWorkspace() {
             </Button>
           </section>
         )}
+
         {vault.length > 0 && (
-          <section className="mb-6 border-b pb-6">
+          <section className="mb-6 rounded-2xl border bg-card p-4 shadow-paper">
             <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
               {t("savedSignatures")}
             </h3>
@@ -551,7 +585,7 @@ export function SigningWorkspace() {
               {vault.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2"
+                  className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"
                 >
                   <button
                     type="button"
@@ -577,8 +611,9 @@ export function SigningWorkspace() {
             </div>
           </section>
         )}
+
         {pdf && (
-          <section className="border-t pt-6">
+          <section className="rounded-2xl border bg-card p-5 shadow-paper">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{t("signPlace")}</h2>
               <div className="flex items-center gap-2">
@@ -593,7 +628,7 @@ export function SigningWorkspace() {
                 >
                   {t("previous")}
                 </Button>
-                <span className="text-sm">
+                <span className="text-sm font-mono">
                   {pageIndex + 1} / {pdf.pages.length}
                 </span>
                 <Button
@@ -631,7 +666,7 @@ export function SigningWorkspace() {
               </label>
             </fieldset>
             <div className="mb-4 flex flex-wrap items-center gap-6">
-              <div className="min-w-64 flex-1 max-w-md">
+              <div className="min-w-64 max-w-md flex-1">
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
                   {t("watermarkLabel")}
                 </label>
@@ -639,7 +674,7 @@ export function SigningWorkspace() {
                   value={watermarkText}
                   onChange={(e) => setWatermarkText(e.target.value)}
                   placeholder={t("watermarkPlaceholder")}
-                  className="h-9 w-full rounded-md border bg-card px-3 text-sm"
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 />
               </div>
               <label className="inline-flex items-center gap-2 text-xs">
@@ -661,79 +696,81 @@ export function SigningWorkspace() {
                 {t("signPreviewError")}
               </p>
             )}
-            <div
-              className="relative mx-auto w-fit max-w-full overflow-hidden rounded border bg-muted"
-              style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}
-            >
-              <canvas
-                ref={previewRef}
-                aria-label={t("signPdf")}
-                className={`block h-auto max-w-full ${preview !== "ready" ? "invisible" : ""}`}
-              />
-              {preview === "ready" &&
-                pagePinned.map((item) => (
+            <div className="rounded-lg bg-stage p-2">
+              <div
+                className="relative mx-auto w-fit max-w-full overflow-hidden rounded bg-white"
+                style={{ aspectRatio: `${pageSize.width} / ${pageSize.height}` }}
+              >
+                <canvas
+                  ref={previewRef}
+                  aria-label={t("signPdf")}
+                  className={`block h-auto max-w-full rounded ${preview !== "ready" ? "invisible" : ""}`}
+                />
+                {preview === "ready" &&
+                  pagePinned.map((item) => (
+                    <img
+                      key={item.id}
+                      src={item.signature.data}
+                      alt=""
+                      draggable={false}
+                      className="pointer-events-none absolute border border-primary/40"
+                      style={{
+                        left: `${item.placement.x * 100}%`,
+                        top: `${item.placement.y * 100}%`,
+                        width: `${item.placement.width * 100}%`,
+                        opacity: item.opacity ?? 1,
+                        height: "auto",
+                      }}
+                    />
+                  ))}
+                {signature && preview === "ready" && (
                   <img
-                    key={item.id}
-                    src={item.signature.data}
-                    alt=""
+                    src={signature.data}
+                    alt={t("signPlace")}
                     draggable={false}
-                    className="pointer-events-none absolute border border-primary/40"
+                    onPointerDown={(e) => {
+                      if (disabled) return;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      drag.current = { x: e.clientX, y: e.clientY, startX: safe.x, startY: safe.y };
+                    }}
+                    onPointerMove={(e) => {
+                      const d = drag.current;
+                      const parent = e.currentTarget.parentElement;
+                      if (!d || !parent || !page || !e.currentTarget.hasPointerCapture(e.pointerId))
+                        return;
+                      const r = parent.getBoundingClientRect();
+                      setPlacement(
+                        clampPlacement(
+                          {
+                            ...safe,
+                            x: d.startX + (e.clientX - d.x) / r.width,
+                            y: d.startY + (e.clientY - d.y) / r.height,
+                          },
+                          signature.aspect,
+                          page,
+                        ),
+                      );
+                    }}
+                    onPointerUp={() => {
+                      drag.current = null;
+                    }}
+                    onPointerCancel={() => {
+                      drag.current = null;
+                    }}
+                    onLostPointerCapture={() => {
+                      drag.current = null;
+                    }}
+                    className="absolute cursor-move touch-none border-2 border-dashed border-primary"
                     style={{
-                      left: `${item.placement.x * 100}%`,
-                      top: `${item.placement.y * 100}%`,
-                      width: `${item.placement.width * 100}%`,
-                      opacity: item.opacity ?? 1,
+                      left: `${safe.x * 100}%`,
+                      top: `${safe.y * 100}%`,
+                      width: `${safe.width * 100}%`,
+                      opacity,
                       height: "auto",
                     }}
                   />
-                ))}
-              {signature && preview === "ready" && (
-                <img
-                  src={signature.data}
-                  alt={t("signPlace")}
-                  draggable={false}
-                  onPointerDown={(e) => {
-                    if (disabled) return;
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    drag.current = { x: e.clientX, y: e.clientY, startX: safe.x, startY: safe.y };
-                  }}
-                  onPointerMove={(e) => {
-                    const d = drag.current;
-                    const parent = e.currentTarget.parentElement;
-                    if (!d || !parent || !page || !e.currentTarget.hasPointerCapture(e.pointerId))
-                      return;
-                    const r = parent.getBoundingClientRect();
-                    setPlacement(
-                      clampPlacement(
-                        {
-                          ...safe,
-                          x: d.startX + (e.clientX - d.x) / r.width,
-                          y: d.startY + (e.clientY - d.y) / r.height,
-                        },
-                        signature.aspect,
-                        page,
-                      ),
-                    );
-                  }}
-                  onPointerUp={() => {
-                    drag.current = null;
-                  }}
-                  onPointerCancel={() => {
-                    drag.current = null;
-                  }}
-                  onLostPointerCapture={() => {
-                    drag.current = null;
-                  }}
-                  className="absolute cursor-move touch-none border border-dashed border-muted-foreground"
-                  style={{
-                    left: `${safe.x * 100}%`,
-                    top: `${safe.y * 100}%`,
-                    width: `${safe.width * 100}%`,
-                    opacity,
-                    height: "auto",
-                  }}
-                />
-              )}
+                )}
+              </div>
             </div>
             <div className="mx-auto mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-3">
@@ -758,7 +795,7 @@ export function SigningWorkspace() {
                         ),
                       );
                   }}
-                  className="min-w-0 flex-1"
+                  className="min-w-0 flex-1 accent-primary"
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -774,7 +811,7 @@ export function SigningWorkspace() {
                   step="0.05"
                   value={opacity}
                   onChange={(e) => setOpacity(Number(e.target.value))}
-                  className="min-w-0 flex-1"
+                  className="min-w-0 flex-1 accent-primary"
                 />
               </div>
             </div>
