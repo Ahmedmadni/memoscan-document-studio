@@ -128,6 +128,12 @@ jobs:
           grep -R -q 'ورقة' .output/public
           test -s .output/public/memoscan-logo.svg
 
+      - name: Allow more time for the Gradle distribution download
+        run: |
+          wrapper=android/gradle/wrapper/gradle-wrapper.properties
+          sed -i '/^networkTimeout=/d' "$wrapper"
+          printf '\nnetworkTimeout=120000\n' >> "$wrapper"
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
