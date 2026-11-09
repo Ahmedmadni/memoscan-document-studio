@@ -14,7 +14,7 @@ function encodeUtf8(str: string): Uint8Array {
 }
 
 function decodeUtf8(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8").decode(bytes);
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 /** Encode ZATCA 5-tag TLV payload into Base64 for Saudi e-Invoicing QR codes. */
@@ -53,21 +53,35 @@ export function encodeZatcaTlvBase64(data: ZatcaInvoiceData): string {
 export function decodeZatcaTlvBase64(base64Str: string): ZatcaInvoiceData | null {
   try {
     const clean = base64Str.trim();
-    if (!clean) return null;
+    if (!clean || clean.length > 700) return null;
     const bin = atob(clean);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const tags: Record<number, string> = {};
     let idx = 0;
-    while (idx + 2 <= bytes.length) {
-      const tag = bytes[idx]!;
-      const len = bytes[idx + 1]!;
+    while (idx < bytes.length) {
+      if (idx + 2 > bytes.length) return null;
+      const tag = bytes[idx];
+      const len = bytes[idx + 1];
       idx += 2;
-      if (idx + len > bytes.length) break;
-      tags[tag] = decodeUtf8(bytes.subarray(idx, idx + len));
+      if (idx + len > bytes.length) return null;
+      // Later tags can contain binary signature data.
+      if (tag >= 1 && tag <= 5) {
+        if (tag in tags) return null;
+        tags[tag] = decodeUtf8(bytes.subarray(idx, idx + len)).trim();
+      }
       idx += len;
     }
-    if (!tags[1] && !tags[2]) return null;
+    const amount = /^-?\d+(?:\.\d{1,2})?$/;
+    if (
+      !tags[1] ||
+      !/^3\d{13}3$/.test(tags[2] ?? "") ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(tags[3] ?? "") ||
+      !Number.isFinite(Date.parse(tags[3] ?? "")) ||
+      !amount.test(tags[4] ?? "") ||
+      !amount.test(tags[5] ?? "")
+    )
+      return null;
     return {
       sellerName: tags[1] ?? "",
       vatNumber: tags[2] ?? "",
@@ -89,7 +103,7 @@ export function formatZatcaSummary(data: ZatcaInvoiceData, lang: "ar" | "en" = "
       `VAT Reg #: ${data.vatNumber}`,
       `Date: ${data.timestamp}`,
       `Total (incl. VAT): ${data.totalWithVat} SAR`,
-      `VAT (15%): ${data.vatAmount} SAR`,
+      `VAT amount: ${data.vatAmount} SAR`,
     ].join("\n");
   }
   return [
@@ -98,6 +112,6 @@ export function formatZatcaSummary(data: ZatcaInvoiceData, lang: "ar" | "en" = "
     `الرقم الضريبي: ${data.vatNumber}`,
     `التاريخ والوقت: ${data.timestamp}`,
     `الإجمالي شامل الضريبة: ${data.totalWithVat} ريال`,
-    `مبلغ ضريبة القيمة المضافة (15%): ${data.vatAmount} ريال`,
+    `مبلغ ضريبة القيمة المضافة: ${data.vatAmount} ريال`,
   ].join("\n");
 }

@@ -19,10 +19,15 @@ export async function renderOutputs(original: Blob, settings: EditSettings) {
 }
 
 /** Decode, auto-detect edges, process, and build a page record (not yet saved). */
-export async function buildPage(docId: string, file: Blob, id = uid()): Promise<PageRecord> {
+export async function buildPage(
+  docId: string,
+  file: Blob,
+  id = uid(),
+  approvedSettings?: EditSettings,
+): Promise<PageRecord> {
   const src = await loadImageCanvas(file, MAX_DIM);
-  const { corners, detected } = detectDocument(src);
-  const settings = defaultSettings(corners);
+  const detection = approvedSettings ? null : detectDocument(src);
+  const settings = approvedSettings ?? defaultSettings(detection?.corners);
   const out = processPage(src, settings, MAX_DIM);
   // Store a re-encoded original (capped size) so re-editing stays fast.
   const original = await canvasToBlob(src, "image/jpeg", 0.95);
@@ -35,7 +40,7 @@ export async function buildPage(docId: string, file: Blob, id = uid()): Promise<
     width: out.width,
     height: out.height,
     settings,
-    autoDetected: detected,
+    autoDetected: detection?.detected ?? false,
     createdAt: Date.now(),
   };
 }

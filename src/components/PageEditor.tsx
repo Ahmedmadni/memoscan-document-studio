@@ -1,5 +1,5 @@
 import { Loader2, Redo2, RotateCcw, RotateCw, Undo2, Wand2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -44,7 +44,7 @@ export function PageEditor({
   const { t } = useI18n();
   const [src, setSrc] = useState<HTMLCanvasElement | null>(null);
   const [srcUrl, setSrcUrl] = useState("");
-  const [tab, setTab] = useState<"corners" | "adjust">("corners");
+  const [tab, setTab] = useState<"corners" | "adjust">("adjust");
   const [hist, setHist] = useState({
     past: [] as EditSettings[],
     present: page.settings,
@@ -53,7 +53,7 @@ export function PageEditor({
   const last = useRef({ key: "", time: 0 });
   const [after, setAfter] = useState("");
   const [before, setBefore] = useState("");
-  const [split, setSplit] = useState(50);
+  const [split, setSplit] = useState(0);
   const [saving, setSaving] = useState(false);
   const [activeDragIdx, setActiveDragIdx] = useState<number | null>(null);
   const s = hist.present;
@@ -70,7 +70,7 @@ export function PageEditor({
     };
   }, [page.original]);
 
-  const preview = src ? scaleCanvas(src, 1000) : null;
+  const preview = useMemo(() => (src ? scaleCanvas(src, 1000) : null), [src]);
   useEffect(() => {
     if (!preview || tab !== "adjust") return;
     const id = setTimeout(() => {
@@ -84,8 +84,7 @@ export function PageEditor({
       }
     }, 120);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s, src, tab]);
+  }, [s, preview, tab, t]);
 
   function update(patch: Partial<EditSettings>, key: string) {
     const now = Date.now();
@@ -222,7 +221,10 @@ export function PageEditor({
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-stage p-4" dir="ltr">
+      <div
+        className="relative flex min-h-0 flex-1 items-center justify-center bg-stage p-4"
+        dir="ltr"
+      >
         {!src && <Loader2 className="size-8 animate-spin text-stage-foreground" />}
         {src && tab === "corners" && (
           <div ref={box} className="relative touch-none select-none">
@@ -278,16 +280,20 @@ export function PageEditor({
         {src && tab === "adjust" && after && (
           <div className="relative h-full max-w-full">
             <img src={after} alt={t("after")} className="h-full max-w-full object-contain" />
-            <img
-              src={before}
-              alt={t("before")}
-              className="absolute inset-0 h-full w-full object-contain"
-              style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}
-            />
-            <div
-              className="pointer-events-none absolute inset-y-0 w-0.5 bg-handle"
-              style={{ left: `${split}%` }}
-            />
+            {split > 0 && (
+              <>
+                <img
+                  src={before}
+                  alt={t("before")}
+                  className="absolute inset-0 h-full w-full object-contain"
+                  style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}
+                />
+                <div
+                  className="pointer-events-none absolute inset-y-0 w-0.5 bg-handle"
+                  style={{ left: `${split}%` }}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -320,6 +326,20 @@ export function PageEditor({
         ) : (
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
             <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <Button variant="outline" size="sm" onClick={() => rot(-90)}>
+                <RotateCcw /> {t("rotateL")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => rot(90)}>
+                <RotateCw /> {t("rotateR")}
+              </Button>
+            </div>
+            {slider("brightness", "brightness", -100, 100)}
+            {slider("contrast", "contrast", -100, 100)}
+            {s.filter === "bw" || s.filter === "text"
+              ? slider("threshold", "threshold", 0, 30)
+              : slider("sharpen", "sharpen", 0, 100)}
+            {slider("angle", "deskew", -15, 15, 0.5)}
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
               {FILTERS.map(([f, k]) => (
                 <Button
                   variant="outline"
@@ -332,22 +352,6 @@ export function PageEditor({
                   {t(k)}
                 </Button>
               ))}
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label={t("rotateL")}
-                onClick={() => rot(-90)}
-              >
-                <RotateCcw />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label={t("rotateR")}
-                onClick={() => rot(90)}
-              >
-                <RotateCw />
-              </Button>
               {onApplyAll && (
                 <Button
                   variant="secondary"
@@ -378,12 +382,6 @@ export function PageEditor({
               </label>
               <p className="text-xs text-muted-foreground">{t("curvedEdgesLimit")}</p>
             </div>
-            {slider("angle", "deskew", -15, 15, 0.5)}
-            {slider("brightness", "brightness", -100, 100)}
-            {slider("contrast", "contrast", -100, 100)}
-            {s.filter === "bw" || s.filter === "text"
-              ? slider("threshold", "threshold", 0, 30)
-              : slider("sharpen", "sharpen", 0, 100)}
             <label className="block text-sm sm:col-span-2">
               {t("compare")}
               <input

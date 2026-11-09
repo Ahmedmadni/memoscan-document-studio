@@ -8,6 +8,7 @@ import { ImagePickers } from "@/components/ImagePickers";
 import { createDoc, deleteDoc } from "@/lib/db";
 import { addFilesToDoc, defaultDocName } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
+import type { EditSettings } from "@/lib/imaging";
 import { useI18n } from "@/lib/i18n";
 export const Route = createFileRoute("/scan")({
   head: () => ({
@@ -32,12 +33,17 @@ function ScanPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null);
-  async function startWith(files: File[]) {
+  async function startWith(files: File[], edits?: ReadonlyMap<File, EditSettings>) {
     if (!files.length || busy) return;
     setBusy({ done: 0, total: files.length });
     try {
       const doc = await createDoc(defaultDocName(t("untitled"), lang));
-      const result = await addFilesToDoc(doc.id, files, (done, total) => setBusy({ done, total }));
+      const result = await addFilesToDoc(
+        doc.id,
+        files,
+        (done, total) => setBusy({ done, total }),
+        edits,
+      );
       if (result.failed) toast.error(t(errorKey(result.firstError)));
       // Failed imports must not leave empty documents in the library.
       if (result.failed === files.length) {
@@ -65,7 +71,10 @@ function ScanPage() {
               <p className="mb-2 text-xs font-medium text-muted-foreground">{t("scanCaption")}</p>
               <h2 className="text-xl font-semibold">{t("selectSource")}</h2>
             </div>
-            <ImagePickers onFiles={(files) => void startWith(files)} disabled={!!busy} />
+            <ImagePickers
+              onFiles={(files, edits) => void startWith(files, edits)}
+              disabled={!!busy}
+            />
             {busy && (
               <p role="status" className="flex items-center gap-2 text-sm text-primary">
                 <Loader2 className="size-4 animate-spin" />

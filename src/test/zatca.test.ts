@@ -22,3 +22,19 @@ describe("Saudi ZATCA TLV Base64 e-invoice helper", () => {
     expect(decodeZatcaTlvBase64("not-valid-base64!!!")).toBeNull();
   });
 });
+
+it("requires all five basic fields and rejects truncated or repeated tags", () => {
+  const encoded = encodeZatcaTlvBase64({
+    sellerName: "Test seller",
+    vatNumber: "300123456700003",
+    timestamp: "2026-11-06T12:30:00Z",
+    totalWithVat: "115.00",
+    vatAmount: "15.00",
+  });
+  const bytes = atob(encoded);
+  expect(decodeZatcaTlvBase64(btoa(bytes.slice(0, -1)))).toBeNull();
+  expect(decodeZatcaTlvBase64(btoa(bytes + bytes))).toBeNull();
+  expect(decodeZatcaTlvBase64(btoa(bytes + "\x06\x02\xff\xfe"))).toEqual(
+    decodeZatcaTlvBase64(encoded),
+  );
+});

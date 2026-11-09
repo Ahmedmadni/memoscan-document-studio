@@ -1,5 +1,5 @@
 import { createDoc, getDoc, getPages, putDoc, putPage, uid, type DocRecord } from "./db";
-import type { FilterMode } from "./imaging";
+import type { EditSettings, FilterMode } from "./imaging";
 import { buildPage, renderOutputs } from "./pages";
 
 export interface ImportResult {
@@ -13,6 +13,7 @@ export async function addFilesToDoc(
   docId: string,
   files: File[],
   onProgress?: (done: number, total: number) => void,
+  edits?: ReadonlyMap<File, EditSettings>,
 ): Promise<ImportResult> {
   let added = 0;
   let failed = 0;
@@ -20,7 +21,8 @@ export async function addFilesToDoc(
   const newIds: string[] = [];
   for (let i = 0; i < files.length; i++) {
     try {
-      const page = await buildPage(docId, files[i]);
+      const file = files[i];
+      const page = await buildPage(docId, file, undefined, edits?.get(file));
       await putPage(page);
       newIds.push(page.id);
       added++;

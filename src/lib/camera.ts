@@ -31,7 +31,9 @@ export async function portraitCamera() {
     const { ScreenOrientation } = await import("@capacitor/screen-orientation");
     await ScreenOrientation.lock({ orientation: "portrait" });
   } else {
-    await screen.orientation?.lock("portrait");
+    const orientation = screen.orientation as
+      (ScreenOrientation & { lock?: (value: "portrait") => Promise<void> }) | undefined;
+    await orientation?.lock?.("portrait");
   }
 }
 
@@ -46,4 +48,16 @@ export async function releaseCameraOrientation() {
 
 export function batchApproved(files: File[], approved: Set<File>) {
   return files.length > 0 && files.every((file) => approved.has(file));
+}
+
+/** Matches the centered 3:4 viewfinder, without stretching or upscaling. */
+export function portraitFrame(width: number, height: number) {
+  const frameWidth = Math.min(width, (height * 3) / 4);
+  const frameHeight = Math.min(height, (width * 4) / 3);
+  return {
+    x: (width - frameWidth) / 2,
+    y: (height - frameHeight) / 2,
+    width: frameWidth,
+    height: frameHeight,
+  };
 }

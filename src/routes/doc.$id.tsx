@@ -8,7 +8,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  rectSortingStrategy,
+  verticalListSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -25,7 +25,6 @@ import {
   GripVertical,
   Loader2,
   Pencil,
-  QrCode,
   RefreshCw,
   Share2,
   Sparkles,
@@ -34,6 +33,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { InvoiceQrReader } from "@/components/InvoiceQrReader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,7 @@ import {
   type PdfPageSize,
   type PdfQuality,
 } from "@/lib/pdf";
-import { decodeZatcaTlvBase64, encodeZatcaTlvBase64, formatZatcaSummary } from "@/lib/zatca";
+import { formatZatcaSummary, type ZatcaInvoiceData } from "@/lib/zatca";
 
 export const Route = createFileRoute("/doc/$id")({
   head: () => ({
@@ -118,7 +118,6 @@ function DocPage() {
   const [pageNumbers, setPageNumbers] = useState(false);
   const [watermarkText, setWatermarkText] = useState("");
   const [notes, setNotes] = useState("");
-  const [zatcaInput, setZatcaInput] = useState("");
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
@@ -224,19 +223,20 @@ function DocPage() {
     });
   };
 
-  function handleDecodeZatca(raw: string) {
-    const decoded = decodeZatcaTlvBase64(raw);
-    if (!decoded) {
-      toast.error(t("zatcaInvalid"));
-      return;
-    }
-    const block = formatZatcaSummary(decoded, lang);
+  async function saveInvoiceNotes(invoice: ZatcaInvoiceData) {
+    if (!doc) return;
+    const block = formatZatcaSummary(invoice, lang);
+    if (notes.includes(block)) return;
     const nextNotes = notes ? `${notes}\n\n${block}` : block;
+    const next = {
+      ...doc,
+      notes: nextNotes,
+      category: doc.category ?? "invoices",
+      updatedAt: Date.now(),
+    } satisfies DocRecord;
+    await putDoc(next);
+    setDoc(next);
     setNotes(nextNotes);
-    void run("", () =>
-      saveOrder(ids, { ...doc!, notes: nextNotes, category: doc?.category ?? "invoices" }),
-    );
-    toast.success(t("zatcaSuccess"));
   }
 
   return (
@@ -283,10 +283,13 @@ function DocPage() {
         <ImagePickers
           size="default"
           disabled={!!busy}
-          onFiles={(files) =>
+          onFiles={(files, edits) =>
             run(t("processing"), async () => {
-              const r = await addFilesToDoc(doc.id, files, (a, b) =>
-                setBusy(`${t("processing")} ${a}/${b}`),
+              const r = await addFilesToDoc(
+                doc.id,
+                files,
+                (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
+                edits,
               );
               if (r.failed) toast.error(t(errorKey(r.firstError)));
               await load();
@@ -333,8 +336,8 @@ function DocPage() {
             </div>
             <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={ids} strategy={rectSortingStrategy}>
-                <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                <ul className="mx-auto max-w-2xl space-y-4">
                   {pages.map((p, i) => (
                     <SortablePageCard
                       key={p.id}
@@ -429,47 +432,8 @@ function DocPage() {
               className="w-full rounded-lg border bg-card p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
 
-            <div className="rounded-xl border bg-card p-3 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                  <QrCode className="size-4" />
-                  {t("zatcaTitle")}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const sampleB64 = encodeZatcaTlvBase64({
-                      sellerName: "مكتب أحمد المدني للاستشارات المالية",
-                      vatNumber: "300123456700003",
-                      timestamp: new Date().toISOString().slice(0, 19) + "Z",
-                      totalWithVat: "14950.00",
-                      vatAmount: "1950.00",
-                    });
-                    setZatcaInput(sampleB64);
-                    handleDecodeZatca(sampleB64);
-                  }}
-                >
-                  {t("zatcaSampleBtn")}
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <input
-                  value={zatcaInput}
-                  onChange={(e) => setZatcaInput(e.target.value)}
-                  placeholder={t("zatcaPlaceholder")}
-                  dir="ltr"
-                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-xs"
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleDecodeZatca(zatcaInput)}
-                >
-                  {t("zatcaDecodeBtn")}
-                </Button>
-              </div>
-            </div>
+            <h2 className="text-sm font-semibold">{t("zatcaTitle")}</h2>
+            <InvoiceQrReader onSave={saveInvoiceNotes} />
           </section>
         )}
 
@@ -603,6 +567,7 @@ function DocPage() {
       </main>
       {editing && (
         <PageEditor
+          key={editing.id}
           page={editing}
           onClose={() => setEditing(null)}
           onApplyAll={async (filter) => {
@@ -653,11 +618,11 @@ function SortablePageCard({
     >
       <div className="relative">
         <button
-          className="relative block aspect-[3/4] w-full bg-muted"
+          className="relative flex min-h-32 w-full items-center justify-center bg-muted p-3"
           onClick={onEdit}
           aria-label={`${t("edit")} ${i + 1}`}
         >
-          <img src={p.thumb} alt="" className="size-full object-contain" />
+          <img src={p.thumb} alt="" className="max-h-72 max-w-full object-contain" />
           <span className="absolute start-2 top-2 rounded-md bg-stage px-2 text-xs text-stage-foreground">
             {i + 1}
           </span>

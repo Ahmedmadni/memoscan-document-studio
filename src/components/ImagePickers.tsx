@@ -8,8 +8,6 @@ import {
   SwitchCamera,
   Zap,
   ZapOff,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Images,
   SlidersHorizontal,
@@ -17,15 +15,13 @@ import {
 import {
   detectDocument,
   FULL_CORNERS,
-  isConvexQuad,
   loadImageCanvas,
-  warpPerspective,
   processPage,
   defaultSettings,
   type EditSettings,
   type Corners,
 } from "@/lib/imaging";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
 import { useI18n } from "@/lib/i18n";
@@ -33,6 +29,7 @@ import {
   batchApproved,
   cameraControls,
   portraitCamera,
+  portraitFrame,
   releaseCameraOrientation,
   setCameraControl,
 } from "@/lib/camera";
@@ -43,7 +40,7 @@ export function ImagePickers({
   disabled,
   size = "lg",
 }: {
-  onFiles: (files: File[]) => void;
+  onFiles: (files: File[], edits?: ReadonlyMap<File, EditSettings>) => void;
   disabled?: boolean;
   size?: "default" | "lg";
 }) {
@@ -65,7 +62,6 @@ export function ImagePickers({
   const stream = useRef<MediaStream | null>(null);
   const captureRevision = useRef(0);
   const [capturing, setCapturing] = useState(false);
-  const [reviewBusy, setReviewBusy] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -75,19 +71,32 @@ export function ImagePickers({
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [editingReview, setEditingReview] = useState(false);
   const [reviewSettings, setReviewSettings] = useState<Map<File, EditSettings>>(new Map());
-  const [reviewCorners, setReviewCorners] = useState<Corners>(FULL_CORNERS);
-  const [activeCorner, setActiveCorner] = useState<number | null>(null);
-  const [reviewImageSize, setReviewImageSize] = useState({ width: 0, height: 0 });
-  const reviewUrl = useMemo(
-    () => (reviewFile ? URL.createObjectURL(reviewFile) : null),
-    [reviewFile],
-  );
-  useEffect(
-    () => () => {
-      if (reviewUrl) URL.revokeObjectURL(reviewUrl);
-    },
-    [reviewUrl],
-  );
+  const [reviewPreview, setReviewPreview] = useState<{
+    file: File;
+    settings: EditSettings;
+    url: string;
+  } | null>(null);
+  const selectedSettings = reviewFile ? reviewSettings.get(reviewFile) : undefined;
+  const selectedPreview =
+    reviewPreview?.file === reviewFile && reviewPreview.settings === selectedSettings
+      ? reviewPreview.url
+      : null;
+  useEffect(() => {
+    if (!reviewFile || !selectedSettings) return;
+    let active = true;
+    void loadImageCanvas(reviewFile, 1000)
+      .then((source) => {
+        if (!active) return;
+        const url = processPage(source, selectedSettings, 1000).toDataURL("image/jpeg", 0.9);
+        setReviewPreview({ file: reviewFile, settings: selectedSettings, url });
+      })
+      .catch(() => {
+        if (active) setCameraError(t("captureFailed"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [reviewFile, selectedSettings, t]);
   useEffect(() => {
     if (!cameraOpen) {
       stream.current?.getTracks().forEach((track) => track.stop());
@@ -106,8 +115,9 @@ export function ImagePickers({
           audio: false,
           video: {
             facingMode: { ideal: facing },
-            width: { ideal: 1280 },
-            height: { ideal: 1920 },
+            width: { ideal: 1920 },
+            height: { ideal: 2560 },
+            aspectRatio: { ideal: 3 / 4 },
           },
         });
         if (!active) {
@@ -134,10 +144,21 @@ export function ImagePickers({
             try {
               const sample = document.createElement("canvas");
               sample.width = 240;
-              sample.height = Math.round((240 * source.videoHeight) / source.videoWidth);
+              sample.height = 320;
               const context = sample.getContext("2d");
               if (!context) return;
-              context.drawImage(source, 0, 0, sample.width, sample.height);
+              const frame = portraitFrame(source.videoWidth, source.videoHeight);
+              context.drawImage(
+                source,
+                frame.x,
+                frame.y,
+                frame.width,
+                frame.height,
+                0,
+                0,
+                sample.width,
+                sample.height,
+              );
               const result = detectDocument(sample);
               setLiveCorners(result.detected ? result.corners : null);
             } catch {
@@ -182,10 +203,7 @@ export function ImagePickers({
 
   const beginReview = (file: File) => {
     setReviewFile(file);
-    setReviewCorners(reviewSettings.get(file)?.corners ?? FULL_CORNERS);
-    setReviewImageSize({ width: 0, height: 0 });
     setCameraError("");
-    setActiveCorner(null);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,7 +223,7 @@ export function ImagePickers({
     setReviewFile(null);
     setEditingReview(false);
     setReviewSettings(new Map());
-    setActiveCorner(null);
+    setReviewPreview(null);
   };
 
   const capture = () => {
@@ -215,16 +233,34 @@ export function ImagePickers({
     const revision = ++captureRevision.current;
     setCapturing(true);
     const canvas = document.createElement("canvas");
-    const scale = Math.min(1, 2400 / Math.max(element.videoWidth, element.videoHeight));
-    canvas.width = Math.round(element.videoWidth * scale);
-    canvas.height = Math.round(element.videoHeight * scale);
+    const frame = portraitFrame(element.videoWidth, element.videoHeight);
+    const scale = Math.min(1, 2400 / frame.height);
+    canvas.width = Math.round(frame.width * scale);
+    canvas.height = Math.round(frame.height * scale);
     const context = canvas.getContext("2d");
     if (!context) {
       setCapturing(false);
       setCameraError(t("captureFailed"));
       return;
     }
-    context.drawImage(element, 0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      element,
+      frame.x,
+      frame.y,
+      frame.width,
+      frame.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    let corners = liveCorners ?? FULL_CORNERS;
+    try {
+      const result = detectDocument(canvas);
+      if (result.detected) corners = result.corners;
+    } catch {
+      // Keep the latest live outline when still-frame detection is unavailable.
+    }
     canvas.toBlob(
       (blob) => {
         if (revision !== captureRevision.current) return;
@@ -238,72 +274,34 @@ export function ImagePickers({
           lastModified: Date.now(),
         });
         setCaptured((current) => [...current, file]);
-        if (captureMode === "single") {
-          setReviewFile(file);
-          setReviewImageSize({ width: canvas.width, height: canvas.height });
-          setReviewCorners(liveCorners ?? FULL_CORNERS);
-        }
+        setReviewSettings((old) =>
+          new Map(old).set(file, { ...defaultSettings(corners), filter: "original", sharpen: 0 }),
+        );
+        if (captureMode === "single") beginReview(file);
       },
       "image/jpeg",
       0.94,
     );
   };
 
-  const acceptReview = async () => {
-    if (!reviewFile || reviewBusy) return;
-    if (!isConvexQuad(reviewCorners)) {
-      setCameraError(t("detectFailed"));
-      return;
-    }
-    const revision = captureRevision.current;
-    setReviewBusy(true);
-    try {
-      const source = await loadImageCanvas(reviewFile, 3000);
-      const settings = reviewSettings.get(reviewFile);
-      const cropped = settings
-        ? processPage(source, { ...settings, corners: reviewCorners }, 2400)
-        : warpPerspective(source, reviewCorners, 3000);
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        cropped.toBlob(
-          (value) => (value ? resolve(value) : reject(new Error("CROP_FAILED"))),
-          "image/jpeg",
-          0.95,
-        ),
-      );
-      const file = new File([blob], reviewFile.name, {
-        type: "image/jpeg",
-        lastModified: Date.now(),
-      });
-      if (revision !== captureRevision.current) return;
-      const nextFiles = captured.map((item) => (item === reviewFile ? file : item));
-      const nextApproved = new Set(approved);
-      nextApproved.delete(reviewFile);
-      nextApproved.add(file);
-      setCaptured(nextFiles);
-      setReviewSettings((old) => {
-        const next = new Map(old);
-        next.delete(reviewFile);
-        return next;
-      });
-      setApproved(nextApproved);
-      const next = nextFiles.find((item) => !nextApproved.has(item));
-      beginReview(next ?? file);
-    } catch {
-      setCameraError(t("captureFailed"));
-    } finally {
-      setReviewBusy(false);
-    }
+  const acceptReview = () => {
+    if (!reviewFile) return;
+    const nextApproved = new Set(approved).add(reviewFile);
+    setApproved(nextApproved);
+    const next = captured.find((file) => !nextApproved.has(file));
+    if (next) beginReview(next);
   };
 
   const acceptCaptured = () => {
-    if (!batchApproved(captured, approved) || reviewBusy) return;
+    if (!batchApproved(captured, approved)) return;
     const files = [...captured];
     setCameraOpen(false);
     setCaptured([]);
     setApproved(new Set());
     setReviewFile(null);
     setReviewSettings(new Map());
-    onFiles(files);
+    setReviewPreview(null);
+    onFiles(files, reviewSettings);
   };
 
   return (
@@ -422,244 +420,141 @@ export function ImagePickers({
               )}
             </div>
           )}
-          <div className="camera-portrait-stage relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-stage">
-            <video
-              ref={video}
-              autoPlay
-              muted
-              playsInline
-              className={`absolute inset-0 h-full w-full object-contain ${reviewFile ? "invisible" : ""}`}
-            />
-            {showGrid && !reviewFile && (
-              <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-25">
-                <div className="border-e border-b border-stage-foreground" />
-                <div className="border-e border-b border-stage-foreground" />
-                <div className="border-b border-stage-foreground" />
-                <div className="border-e border-b border-stage-foreground" />
-                <div className="border-e border-b border-stage-foreground" />
-                <div className="border-b border-stage-foreground" />
-                <div className="border-e border-stage-foreground" />
-                <div className="border-e border-stage-foreground" />
-                <div />
+          <div
+            className="camera-portrait-stage relative min-h-0 flex-1 overflow-hidden"
+            hidden={!!reviewFile}
+          >
+            <div className="camera-portrait-frame">
+              <video ref={video} autoPlay muted playsInline className="size-full object-cover" />
+              {showGrid && (
+                <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-25">
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <div
+                      key={i}
+                      className={`${i % 3 !== 2 ? "border-e" : ""} ${i < 6 ? "border-b" : ""} border-stage-foreground`}
+                    />
+                  ))}
+                </div>
+              )}
+              {liveCorners && (
+                <svg
+                  className="pointer-events-none absolute inset-0 size-full"
+                  viewBox="0 0 240 320"
+                  aria-label={t("livePageEdges")}
+                >
+                  <polygon
+                    points={liveCorners.map((p) => `${p.x * 240},${p.y * 320}`).join(" ")}
+                    className="camera-quad"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              )}
+            </div>
+            {(cameraError || controlError) && (
+              <div
+                className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
+                role="alert"
+              >
+                {cameraError || controlError}
               </div>
             )}
-            {reviewFile && reviewUrl ? (
-              <div className="relative flex h-full w-full items-center justify-center p-4">
-                <img
-                  src={reviewUrl}
-                  alt={t("page")}
-                  className="max-h-full max-w-full object-contain"
-                  draggable={false}
-                  onLoad={(e) =>
-                    setReviewImageSize({
-                      width: e.currentTarget.naturalWidth,
-                      height: e.currentTarget.naturalHeight,
-                    })
-                  }
-                />
-                {reviewImageSize.width > 0 && reviewImageSize.height > 0 && (
-                  <svg
-                    className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)] touch-none"
-                    viewBox={`0 0 ${reviewImageSize.width} ${reviewImageSize.height}`}
-                    preserveAspectRatio="xMidYMid meet"
-                    onPointerMove={(e) => {
-                      if (activeCorner === null) return;
-                      const r = e.currentTarget.getBoundingClientRect();
-                      const scale = Math.min(
-                        r.width / reviewImageSize.width,
-                        r.height / reviewImageSize.height,
-                      );
-                      const renderedWidth = reviewImageSize.width * scale;
-                      const renderedHeight = reviewImageSize.height * scale;
-                      const offsetX = (r.width - renderedWidth) / 2;
-                      const offsetY = (r.height - renderedHeight) / 2;
-                      const x = Math.max(
-                        0,
-                        Math.min(1, (e.clientX - r.left - offsetX) / renderedWidth),
-                      );
-                      const y = Math.max(
-                        0,
-                        Math.min(1, (e.clientY - r.top - offsetY) / renderedHeight),
-                      );
-                      setReviewCorners(
-                        (old) => old.map((p, i) => (i === activeCorner ? { x, y } : p)) as Corners,
-                      );
-                      setApproved((old) => {
-                        const next = new Set(old);
-                        next.delete(reviewFile);
-                        return next;
-                      });
-                    }}
-                    onPointerUp={() => setActiveCorner(null)}
-                    onPointerCancel={() => setActiveCorner(null)}
-                  >
-                    <polygon
-                      className="camera-quad"
-                      points={reviewCorners
-                        .map(
-                          (p) => `${p.x * reviewImageSize.width},${p.y * reviewImageSize.height}`,
-                        )
-                        .join(" ")}
-                      strokeWidth={Math.max(
-                        2,
-                        Math.min(reviewImageSize.width, reviewImageSize.height) * 0.004,
-                      )}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                    {reviewCorners.map((p, i) => (
-                      <circle
-                        className="camera-corner"
-                        key={i}
-                        cx={p.x * reviewImageSize.width}
-                        cy={p.y * reviewImageSize.height}
-                        r={Math.max(
-                          12,
-                          Math.min(reviewImageSize.width, reviewImageSize.height) * 0.025,
-                        )}
-                        strokeWidth={Math.max(
-                          2,
-                          Math.min(reviewImageSize.width, reviewImageSize.height) * 0.003,
-                        )}
-                        onPointerDown={(e) => {
-                          e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);
-                          setActiveCorner(i);
-                        }}
-                      />
-                    ))}
-                  </svg>
-                )}
-              </div>
-            ) : (
-              <>
-                {liveCorners && (
-                  <svg
-                    className="pointer-events-none absolute inset-0 h-full w-full"
-                    viewBox={`0 0 ${video.current?.videoWidth || 1} ${video.current?.videoHeight || 1}`}
-                    preserveAspectRatio="xMidYMid meet"
-                    aria-label={t("livePageEdges")}
-                  >
-                    <polygon
-                      points={liveCorners
-                        .map(
-                          (p) =>
-                            `${p.x * (video.current?.videoWidth || 1)},${p.y * (video.current?.videoHeight || 1)}`,
-                        )
-                        .join(" ")}
-                      className="camera-quad"
-                      strokeWidth="3"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                    {liveCorners.map((p, i) => (
-                      <circle
-                        key={i}
-                        cx={p.x * (video.current?.videoWidth || 1)}
-                        cy={p.y * (video.current?.videoHeight || 1)}
-                        r="7"
-                        className="camera-corner"
-                      />
-                    ))}
-                  </svg>
-                )}
-                {(cameraError || controlError) && (
-                  <div
-                    className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
-                    role="alert"
-                  >
-                    {cameraError || controlError}
-                  </div>
-                )}
-                {!cameraError && !cameraReady && (
-                  <p className="absolute bottom-5 rounded-full bg-stage/60 px-4 py-2 text-sm">
-                    {t("cameraStarting")}
-                  </p>
-                )}
-              </>
+            {!cameraError && !cameraReady && (
+              <p className="absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-stage/60 px-4 py-2 text-sm">
+                {t("cameraStarting")}
+              </p>
             )}
           </div>
 
           {reviewFile && (
-            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-stage-foreground/15 p-3">
-              <Button
-                className="camera-tool"
-                variant="ghost"
-                size="icon"
-                aria-label={t("previous")}
-                disabled={reviewBusy || captured.indexOf(reviewFile) <= 0}
-                onClick={() => {
-                  const file = captured[captured.indexOf(reviewFile) - 1];
-                  if (file) beginReview(file);
-                }}
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="text-sm" dir="ltr">
-                {captured.indexOf(reviewFile) + 1} / {captured.length}
-              </span>
-              <Button
-                className="camera-tool"
-                variant="ghost"
-                size="icon"
-                aria-label={t("next")}
-                disabled={reviewBusy || captured.indexOf(reviewFile) >= captured.length - 1}
-                onClick={() => {
-                  const file = captured[captured.indexOf(reviewFile) + 1];
-                  if (file) beginReview(file);
-                }}
-              >
-                <ChevronRight />
-              </Button>
-              <Button
-                variant="ghost"
-                className="camera-tool"
-                size="icon"
-                aria-label={t("edit")}
-                title={t("edit")}
-                disabled={reviewBusy || approved.has(reviewFile)}
-                onClick={() => setEditingReview(true)}
-              >
-                <SlidersHorizontal />
-              </Button>
-              <Button
-                variant="ghost"
-                className="camera-tool"
-                size="icon"
-                aria-label={t("removeCaptured")}
-                title={t("removeCaptured")}
-                disabled={reviewBusy}
-                onClick={() => {
-                  const index = captured.indexOf(reviewFile);
-                  const remaining = captured.filter((file) => file !== reviewFile);
-                  setCaptured(remaining);
-                  setApproved((old) => {
-                    const next = new Set(old);
-                    next.delete(reviewFile);
-                    return next;
-                  });
-                  setReviewSettings((old) => {
-                    const next = new Map(old);
-                    next.delete(reviewFile);
-                    return next;
-                  });
-                  const next = remaining[Math.min(index, remaining.length - 1)];
-                  if (next) beginReview(next);
-                  else setReviewFile(null);
-                }}
-              >
-                <Minus />
-              </Button>
-              <Button
-                disabled={reviewBusy || approved.has(reviewFile)}
-                onClick={() => void acceptReview()}
-              >
-                {reviewBusy ? <Loader2 className="animate-spin" /> : <Check />}
-                {t(approved.has(reviewFile) ? "approvedPage" : "approvePage")}
-              </Button>
-              {cameraError && (
-                <p role="alert" className="w-full text-center text-destructive-foreground">
-                  {cameraError}
-                </p>
-              )}
-            </div>
+            <>
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4 sm:flex-row">
+                <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2">
+                  <p className="text-sm font-medium">
+                    {t("selectedPagePreview")} · {captured.indexOf(reviewFile) + 1}
+                  </p>
+                  {selectedPreview ? (
+                    <img
+                      src={selectedPreview}
+                      alt={t("page")}
+                      className="min-h-0 max-h-[50dvh] max-w-full object-contain"
+                    />
+                  ) : (
+                    !cameraError && <p role="status">{t("loading")}</p>
+                  )}
+                </div>
+                <ol
+                  className="max-h-32 shrink-0 space-y-1 overflow-y-auto sm:max-h-full sm:w-48"
+                  aria-label={t("cameraReview")}
+                >
+                  {captured.map((file, index) => (
+                    <li key={file.name}>
+                      <Button
+                        variant="ghost"
+                        className="camera-tool w-full justify-between data-[selected=true]:bg-stage-foreground/20"
+                        aria-pressed={file === reviewFile}
+                        data-selected={file === reviewFile}
+                        onClick={() => beginReview(file)}
+                      >
+                        {t("page")} {index + 1}
+                        {approved.has(file) && <Check aria-hidden="true" />}
+                      </Button>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-stage-foreground/15 p-3">
+                <Button
+                  variant="ghost"
+                  className="camera-tool"
+                  aria-label={t("edit")}
+                  title={t("edit")}
+                  onClick={() => setEditingReview(true)}
+                >
+                  <SlidersHorizontal />
+                  {t("editSelectedPage")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="camera-tool"
+                  size="icon"
+                  aria-label={t("removeCaptured")}
+                  title={t("removeCaptured")}
+                  onClick={() => {
+                    const index = captured.indexOf(reviewFile);
+                    const remaining = captured.filter((file) => file !== reviewFile);
+                    setCaptured(remaining);
+                    setApproved((old) => {
+                      const next = new Set(old);
+                      next.delete(reviewFile);
+                      return next;
+                    });
+                    setReviewSettings((old) => {
+                      const next = new Map(old);
+                      next.delete(reviewFile);
+                      return next;
+                    });
+                    const next = remaining[Math.min(index, remaining.length - 1)];
+                    if (next) beginReview(next);
+                    else setReviewFile(null);
+                  }}
+                >
+                  <Minus />
+                </Button>
+                <Button
+                  disabled={approved.has(reviewFile) || !selectedPreview}
+                  onClick={acceptReview}
+                >
+                  <Check />
+                  {t(approved.has(reviewFile) ? "approvedPage" : "approvePage")}
+                </Button>
+                {cameraError && (
+                  <p role="alert" className="w-full text-center text-destructive-foreground">
+                    {cameraError}
+                  </p>
+                )}
+              </div>
+            </>
           )}
           <footer className="shrink-0 border-t border-stage-foreground/15 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {reviewFile ? (
@@ -667,7 +562,6 @@ export function ImagePickers({
                 <Button
                   variant="ghost"
                   className="camera-tool"
-                  disabled={reviewBusy}
                   onClick={() => {
                     setReviewFile(null);
                     setCameraError("");
@@ -676,10 +570,7 @@ export function ImagePickers({
                   <Camera />
                   {t("resumeCapture")}
                 </Button>
-                <Button
-                  disabled={!batchApproved(captured, approved) || reviewBusy}
-                  onClick={acceptCaptured}
-                >
+                <Button disabled={!batchApproved(captured, approved)} onClick={acceptCaptured}>
                   <Check />
                   {t("finishBatch")} ({approved.size}/{captured.length})
                 </Button>
@@ -774,21 +665,19 @@ export function ImagePickers({
                   original: reviewFile,
                   processed: reviewFile,
                   thumb: "",
-                  width: reviewImageSize.width,
-                  height: reviewImageSize.height,
+                  width: 0,
+                  height: 0,
                   createdAt: reviewFile.lastModified,
                   autoDetected: false,
-                  settings: {
-                    ...defaultSettings(reviewCorners),
-                    filter: "original",
-                    sharpen: 0,
-                    ...reviewSettings.get(reviewFile),
-                    corners: reviewCorners,
-                  },
+                  settings: selectedSettings ?? defaultSettings(),
                 }}
                 onSave={async (settings) => {
                   setReviewSettings((old) => new Map(old).set(reviewFile, settings));
-                  setReviewCorners(settings.corners);
+                  setApproved((old) => {
+                    const next = new Set(old);
+                    next.delete(reviewFile);
+                    return next;
+                  });
                 }}
                 onClose={() => setEditingReview(false)}
               />

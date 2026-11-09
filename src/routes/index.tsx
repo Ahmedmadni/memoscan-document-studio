@@ -142,7 +142,7 @@ function Home() {
                 <span>{t("modeIdCard2in1")}</span>
               </Link>
               <Link
-                to="/documents"
+                to="/invoices"
                 className="flex items-center gap-2.5 rounded-lg border bg-card p-3 text-xs font-medium transition-colors hover:border-primary/50"
               >
                 <QrCode className="size-4 shrink-0 text-primary" />
