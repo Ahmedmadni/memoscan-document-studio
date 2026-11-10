@@ -2,6 +2,8 @@
 
 ## Visual identity refinement
 
+- [ ] Prioritize camera and editor working surfaces, practical controls and review space; verify batch editing and approval on mobile.
+
 - [x] Refine shared colors, navigation and headings; refresh home and scan presentation without changing workflows.
 - [x] Check mobile/desktop Arabic and English layouts and run existing regressions (87 tests; browser import and PDF creation verified).
 

@@ -277,7 +277,7 @@ function DocPage() {
       />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-20">
         {/* CamScanner Document Header Card */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-paper">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-5">
           <div className="min-w-0 flex-1">
             <input
               aria-label={t("docName")}
@@ -355,15 +355,15 @@ function DocPage() {
         ) : (
           <>
             {/* CamScanner Quick Batch Filter Bar */}
-            <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border bg-card p-3 shadow-paper">
+            <div className="flex items-center gap-2 overflow-x-auto border-y py-3">
               <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-primary">
                 <Sparkles className="size-4" />
                 {t("batchFilterLabel")}:
               </span>
               {BATCH_FILTERS.map(([f, labelKey]) => (
-                <button
+                <Button
+                  variant="outline"
                   key={f}
-                  type="button"
                   disabled={!!busy}
                   onClick={() =>
                     void run(t("processing"), async () => {
@@ -374,10 +374,10 @@ function DocPage() {
                       toast.success(t("appliedToAll"));
                     })
                   }
-                  className="chip shrink-0 text-xs"
+                  className="shrink-0 text-xs"
                 >
                   {t(labelKey)}
-                </button>
+                </Button>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
@@ -429,7 +429,7 @@ function DocPage() {
         />
 
         {pages.length > 0 && (
-          <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-paper">
+          <section className="space-y-4 border-t pt-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">{t("ocrNotesTitle")}</h2>
               <div className="flex flex-wrap gap-2">
@@ -486,7 +486,7 @@ function DocPage() {
         {pages.length > 0 && (
           <section
             ref={exportSectionRef}
-            className="scroll-mt-4 space-y-3 rounded-2xl border bg-card p-4 shadow-paper sm:p-5"
+            className="scroll-mt-20 space-y-3 border-t pt-5"
           >
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -658,30 +658,30 @@ function SortablePageCard({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`overflow-hidden rounded-2xl border bg-card shadow-paper ${
+      className={`overflow-hidden rounded-lg border bg-card shadow-paper ${
         isDragging ? "z-10 opacity-60 ring-2 ring-primary" : ""
       }`}
     >
       <div className="relative">
-        <button
-          className="relative flex min-h-32 w-full items-center justify-center bg-muted p-3"
+        <Button variant="ghost"
+          className="relative flex h-72 w-full items-center justify-center rounded-none bg-muted p-4 hover:bg-muted"
           onClick={onEdit}
           aria-label={`${t("edit")} ${i + 1}`}
         >
-          <img src={p.thumb} alt="" className="max-h-72 max-w-full rounded object-contain" />
+          <img src={p.thumb} alt="" className="max-h-full max-w-full rounded object-contain" />
           <span className="absolute start-2 top-2 rounded-md bg-primary px-2 py-0.5 font-mono text-xs font-bold text-primary-foreground shadow">
             {numStr}
           </span>
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost" size="icon"
           {...attributes}
           {...listeners}
           aria-label={`${t("dragToReorder")} ${i + 1}`}
           title={t("dragToReorder")}
-          className="absolute end-1.5 top-1.5 grid size-8 cursor-grab touch-none place-items-center rounded-md bg-stage/80 text-stage-foreground active:cursor-grabbing"
+          className="camera-tool absolute end-2 top-2 grid size-11 cursor-grab touch-none place-items-center rounded-md bg-stage/80 active:cursor-grabbing"
         >
           <GripVertical className="size-4" />
-        </button>
+        </Button>
       </div>
       <p
         className={`px-2.5 pt-1.5 text-[11px] font-medium ${

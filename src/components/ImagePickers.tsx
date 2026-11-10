@@ -336,16 +336,16 @@ export function ImagePickers({
 
       {cameraOpen && (
         <div
-          className="fixed inset-0 z-[70] flex flex-col bg-stage text-stage-foreground"
+          className="camera-workspace fixed inset-0 z-[70] flex flex-col bg-stage text-stage-foreground"
           role="dialog"
           aria-modal="true"
           aria-label={t("scanCamera")}
         >
           <header className="flex items-center justify-between gap-3 border-b border-stage-foreground/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div>
-              <p className="font-semibold">{t("scanCamera")}</p>
-              <p className="text-sm text-stage-foreground/70">
-                {t("capturedPages")}: {captured.length}
+              <p className="flex items-center gap-2 font-semibold">
+                <img src="/memoscan-logo.svg" width={24} height={24} alt="" />
+                {t(reviewFile ? "cameraReview" : "scanCamera")}
               </p>
             </div>
             <Button
@@ -360,7 +360,7 @@ export function ImagePickers({
           </header>
 
           {!reviewFile && (
-            <div className="flex shrink-0 items-center justify-center gap-3 px-4 py-2">
+            <div className="camera-controls flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 py-2">
               <Button
                 size="icon"
                 variant="ghost"
@@ -468,30 +468,31 @@ export function ImagePickers({
 
           {reviewFile && (
             <>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4 sm:flex-row">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 py-3">
                 <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2">
-                  <p className="text-sm font-medium">
+                  <p className="flex items-center gap-2 text-xs font-medium text-stage-foreground/75">
                     {t("selectedPagePreview")} · {captured.indexOf(reviewFile) + 1}
+                    <span className="text-handle">{approved.size}/{captured.length}</span>
                   </p>
                   {selectedPreview ? (
                     <img
                       src={selectedPreview}
                       alt={t("page")}
-                      className="min-h-0 max-h-[50dvh] max-w-full object-contain"
+                      className="min-h-0 max-h-full max-w-full flex-1 object-contain"
                     />
                   ) : (
                     !cameraError && <p role="status">{t("loading")}</p>
                   )}
                 </div>
                 <ol
-                  className="max-h-32 shrink-0 space-y-1 overflow-y-auto sm:max-h-full sm:w-48"
+                  className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto"
                   aria-label={t("cameraReview")}
                 >
                   {captured.map((file, index) => (
-                    <li key={file.name}>
+                    <li key={file.name} className="shrink-0">
                       <Button
                         variant="ghost"
-                        className="camera-tool w-full justify-between data-[selected=true]:bg-stage-foreground/20"
+                        className="camera-tool h-11 gap-2 rounded-md border border-stage-foreground/15 px-3 data-[selected=true]:border-handle data-[selected=true]:bg-handle/10"
                         aria-pressed={file === reviewFile}
                         data-selected={file === reviewFile}
                         onClick={() => beginReview(file)}
@@ -503,16 +504,16 @@ export function ImagePickers({
                   ))}
                 </ol>
               </div>
-              <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-stage-foreground/15 p-3">
+              <div className="flex shrink-0 items-center justify-center gap-2 border-t border-stage-foreground/15 px-3 py-2">
                 <Button
                   variant="ghost"
                   className="camera-tool"
+                  size="icon"
                   aria-label={t("edit")}
                   title={t("edit")}
                   onClick={() => setEditingReview(true)}
                 >
                   <SlidersHorizontal />
-                  {t("editSelectedPage")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -544,6 +545,7 @@ export function ImagePickers({
                 <Button
                   disabled={approved.has(reviewFile) || !selectedPreview}
                   onClick={acceptReview}
+                  className="work-confirm min-h-11 flex-1 sm:flex-none"
                 >
                   <Check />
                   {t(approved.has(reviewFile) ? "approvedPage" : "approvePage")}
@@ -558,7 +560,7 @@ export function ImagePickers({
           )}
           <footer className="shrink-0 border-t border-stage-foreground/15 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {reviewFile ? (
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Button
                   variant="ghost"
                   className="camera-tool"
@@ -570,7 +572,7 @@ export function ImagePickers({
                   <Camera />
                   {t("resumeCapture")}
                 </Button>
-                <Button disabled={!batchApproved(captured, approved)} onClick={acceptCaptured}>
+                <Button className="work-confirm min-h-11 whitespace-normal" disabled={!batchApproved(captured, approved)} onClick={acceptCaptured}>
                   <Check />
                   {t("finishBatch")} ({approved.size}/{captured.length})
                 </Button>
@@ -590,19 +592,17 @@ export function ImagePickers({
                       disabled={capturing || captured.length > 0}
                       aria-pressed={captureMode === mode}
                       onClick={() => setCaptureMode(mode)}
-                      className={
-                        captureMode === mode ? "bg-stage-foreground text-stage" : "camera-tool"
-                      }
+                      className={`min-w-20 rounded-md ${captureMode === mode ? "bg-stage-foreground text-stage" : "camera-tool"}`}
                     >
                       {t(mode === "single" ? "singleShot" : "multiShot")}
                     </Button>
                   ))}
                 </div>
                 <div className="grid grid-cols-[1fr_80px_1fr] items-center gap-3">
-                  <span role="status" className="text-center text-sm">
+                  <span role="status" className="text-center text-[11px] text-stage-foreground/65">
                     {t("capturedPages")}
                     <br />
-                    {captured.length}
+                    <span className="text-lg font-semibold tabular-nums text-stage-foreground">{captured.length}</span>
                   </span>
                   <Button
                     aria-label={t("capturePage")}

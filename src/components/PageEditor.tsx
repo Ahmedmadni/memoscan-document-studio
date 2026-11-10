@@ -3,6 +3,11 @@ import {
   ArrowRight,
   Check,
   Crop,
+  FileText,
+  Image,
+  Palette,
+  Sun,
+  Circle,
   Loader2,
   Maximize2,
   Redo2,
@@ -36,15 +41,15 @@ import {
   type Rotation,
 } from "@/lib/imaging";
 
-const FILTERS: [FilterMode, TKey, string][] = [
-  ["magic", "fMagic", "✨"],
-  ["text", "fText", "📝"],
-  ["paper", "fPaper", "📄"],
-  ["enhance", "fEnhance", "🎨"],
-  ["clean", "fClean", "🌤️"],
-  ["bw", "fBw", "⚫"],
-  ["gray", "fGray", "🌫️"],
-  ["original", "fOriginal", "🖼️"],
+const FILTERS: [FilterMode, TKey, typeof FileText][] = [
+  ["magic", "fMagic", Sparkles],
+  ["text", "fText", FileText],
+  ["paper", "fPaper", Image],
+  ["enhance", "fEnhance", Palette],
+  ["clean", "fClean", Sun],
+  ["bw", "fBw", Circle],
+  ["gray", "fGray", Circle],
+  ["original", "fOriginal", Image],
 ];
 
 // Crop points remain in the original image coordinates used by the export pipeline.
@@ -223,7 +228,7 @@ export function PageEditor({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stage text-stage-foreground">
       {/* CamScanner Dark Top Stepper Bar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-stage-foreground/15 px-3 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))]">
+      <div className="work-toolbar flex shrink-0 flex-wrap items-center gap-1 border-b border-stage-foreground/15 px-2 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))]">
         <Button
           variant="ghost"
           size="icon"
@@ -235,11 +240,11 @@ export function PageEditor({
         </Button>
 
         {/* Step Indicator Pills: 1. Crop -> 2. Filters */}
-        <div className="flex items-center gap-1 rounded-full bg-stage-foreground/10 p-1">
+        <div className="flex items-center gap-1 rounded-md bg-stage-foreground/5 p-1">
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 rounded-full px-3 text-xs ${
+            className={`work-tab h-9 rounded-md px-2 text-xs ${
               tab === "corners"
                 ? "bg-primary text-primary-foreground"
                 : "text-stage-foreground/75 hover:text-stage-foreground"
@@ -254,7 +259,7 @@ export function PageEditor({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 rounded-full px-3 text-xs ${
+            className={`work-tab h-9 rounded-md px-2 text-xs ${
               tab === "adjust"
                 ? "bg-primary text-primary-foreground"
                 : "text-stage-foreground/75 hover:text-stage-foreground"
@@ -382,25 +387,25 @@ export function PageEditor({
           <>
             <p className="text-center text-xs text-stage-foreground/70">{t("dragHint")}</p>
             <div className="mx-auto grid max-w-lg grid-cols-5 items-stretch gap-1">
-              <button type="button" className="cs-dock-action" onClick={() => rot(-90)}>
+              <Button variant="ghost" title={t("rotateL")} className="cs-dock-action h-auto whitespace-normal" onClick={() => rot(-90)}>
                 <RotateCcw className="size-5" />
                 <span>{t("rotateL")}</span>
-              </button>
-              <button type="button" className="cs-dock-action" onClick={() => rot(90)}>
+              </Button>
+              <Button variant="ghost" title={t("rotateR")} className="cs-dock-action h-auto whitespace-normal" onClick={() => rot(90)}>
                 <RotateCw className="size-5" />
                 <span>{t("rotateR")}</span>
-              </button>
-              <button
-                type="button"
-                className="cs-dock-action"
+              </Button>
+              <Button
+                variant="ghost"
+                className="cs-dock-action h-auto whitespace-normal"
                 onClick={() => update({ corners: FULL_CORNERS }, "full" + Date.now())}
               >
                 <Maximize2 className="size-5" />
                 <span>{t("fullImage")}</span>
-              </button>
-              <button
-                type="button"
-                className="cs-dock-action"
+              </Button>
+              <Button
+                variant="ghost"
+                className="cs-dock-action h-auto whitespace-normal"
                 onClick={() => {
                   if (!src) return;
                   const r = detectDocument(src);
@@ -410,11 +415,11 @@ export function PageEditor({
               >
                 <Wand2 className="size-5" />
                 <span>{t("autoDetect")}</span>
-              </button>
+              </Button>
               <Button
                 onClick={() => setTab("adjust")}
                 disabled={!src}
-                className="h-auto min-h-11 flex-col gap-1 rounded-xl px-1 text-xs font-bold"
+                className="work-confirm h-auto min-h-11 flex-col gap-1 rounded-md px-1 text-xs font-bold"
               >
                 <ArrowLeft className="size-4 ltr:rotate-180" />
                 <span>{t("next")}</span>
@@ -425,23 +430,17 @@ export function PageEditor({
           <div className="mx-auto max-w-3xl space-y-3">
             {/* Horizontal CamScanner Filter Swatch Strip */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {FILTERS.map(([f, k, icon]) => (
-                <button
-                  type="button"
+              {FILTERS.map(([f, k, Icon]) => (
+                <Button
+                  variant="ghost"
                   key={f}
                   aria-pressed={s.filter === f}
                   onClick={() => update({ filter: f }, "f" + Date.now())}
-                  className={`flex shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-xs transition ${
-                    s.filter === f
-                      ? "border-primary bg-primary text-primary-foreground shadow"
-                      : "border-stage-foreground/15 bg-stage-foreground/5 text-stage-foreground/85 hover:bg-stage-foreground/10"
-                  }`}
+                  className="work-filter camera-tool flex h-auto shrink-0 flex-col items-center gap-2 border border-stage-foreground/15 px-2 py-2 text-xs"
                 >
-                  <span aria-hidden="true" className="text-base">
-                    {icon}
-                  </span>
-                  <span className="font-medium whitespace-nowrap">{t(k)}</span>
-                </button>
+                  <Icon aria-hidden="true" className="size-5" />
+                  <span className="text-center font-medium leading-tight">{t(k)}</span>
+                </Button>
               ))}
             </div>
 
@@ -536,7 +535,7 @@ export function PageEditor({
                     {t("applyToAllPagesBtn")}
                   </Button>
                 )}
-                <Button onClick={save} disabled={saving || !src} size="sm" className="px-5">
+                <Button onClick={save} disabled={saving || !src} size="sm" className="work-confirm min-h-11 px-5">
                   {saving ? (
                     <Loader2 className="animate-spin" />
                   ) : (
