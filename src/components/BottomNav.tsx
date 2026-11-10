@@ -33,7 +33,7 @@ export function BottomNav() {
             key={to}
             variant="ghost"
             asChild
-            className={`h-16 min-w-0 flex-col gap-1 rounded-none px-1 text-[11px] ${active ? "bg-secondary/60 text-primary" : "text-muted-foreground"}`}
+              className={`brand-nav-item relative h-16 min-w-0 flex-col gap-1 rounded-none px-1 text-[11px] ${active ? "bg-secondary/60 font-semibold text-primary" : "text-muted-foreground"}`}
           >
             <Link to={to} aria-current={active ? "page" : undefined}>
               <Icon className="size-5" />

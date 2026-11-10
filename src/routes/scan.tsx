@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, ScanLine, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
@@ -10,6 +10,7 @@ import { addFilesToDoc, defaultDocName } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import type { EditSettings } from "@/lib/imaging";
 import { useI18n } from "@/lib/i18n";
+import scanDesk from "@/assets/scan-desk.jpg";
 export const Route = createFileRoute("/scan")({
   head: () => ({
     meta: [
@@ -62,19 +63,28 @@ function ScanPage() {
       <AppHeader />
       <main className="mx-auto max-w-5xl px-5 pb-16">
         <PageHeading title={t("scanPageTitle")} />
-        <section className="grid gap-8 py-4 md:grid-cols-[1fr_1.1fr]">
-          <div className="flex flex-col items-start justify-center gap-5 py-5">
-            <span className="grid size-14 place-items-center rounded-lg bg-secondary text-primary">
-              <ScanLine className="size-7" />
+        <section className="pb-8">
+          <div className="relative overflow-hidden border-b">
+            <img src={scanDesk} alt="" width={1408} height={1024} className="scan-entry-image" />
+            <span className="absolute bottom-4 start-4 flex items-center gap-2 rounded-md border bg-card/95 px-3 py-2 text-sm font-semibold text-primary">
+              <img src="/memoscan-logo.svg" width={24} height={24} alt="" />
+              {t("appName")} <span className="text-xs font-normal text-muted-foreground">/ {t("scanCaption")}</span>
             </span>
-            <div>
+          </div>
+          <div className="mx-auto flex max-w-xl flex-col gap-5 py-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground">{t("scanCaption")}</p>
               <h2 className="text-xl font-semibold">{t("selectSource")}</h2>
+              </div>
+              <ShieldCheck className="size-6 text-primary" aria-hidden="true" />
             </div>
+            <div className="scan-source-controls">
             <ImagePickers
               onFiles={(files, edits) => void startWith(files, edits)}
               disabled={!!busy}
             />
+            </div>
             {busy && (
               <p role="status" className="flex items-center gap-2 text-sm text-primary">
                 <Loader2 className="size-4 animate-spin" />
@@ -85,20 +95,6 @@ function ScanPage() {
               <ShieldCheck className="size-4 text-success" />
               {t("privacyShort")}
             </p>
-          </div>
-          <div className="scan-paper-scene" aria-hidden="true">
-            <div className="scan-paper">
-              <div className="scan-mark">
-                <ScanLine />
-              </div>
-              <div className="scan-lines" />
-              <div className="scan-lines" />
-              <div className="scan-lines short" />
-              <div className="scan-photo" />
-              <div className="scan-lines" />
-              <div className="scan-lines short" />
-            </div>
-            <div className="scan-outline" />
           </div>
         </section>
       </main>

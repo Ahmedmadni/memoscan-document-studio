@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Waraqah logo">
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#27B6D6"/>
-      <stop offset="1" stop-color="#087EAD"/>
+      <stop offset="0" stop-color="#087e60"/>
+      <stop offset="1" stop-color="#08634c"/>
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="30" fill="url(#background)"/>
+  <rect width="128" height="128" rx="24" fill="url(#background)"/>
   <path d="M39 18h34l25 25v63a5 5 0 0 1-5 5H39a8 8 0 0 1-8-8V26a8 8 0 0 1 8-8Z" fill="#fff"/>
-  <path d="M73 18v21a5 5 0 0 0 5 5h20" fill="#D9F5FC"/>
-  <path d="M47 58h38M47 72h38M47 86h25" stroke="#0B8FB5" stroke-width="6" stroke-linecap="round"/>
-  <path d="M20 43V29a9 9 0 0 1 9-9h8M108 85v14a9 9 0 0 1-9 9h-8" fill="none" stroke="#B9F1FF" stroke-width="5" stroke-linecap="round"/>
+  <path d="M73 18v21a5 5 0 0 0 5 5h20" fill="#dceee7"/>
+  <path d="M47 58h38M47 72h38M47 86h25" stroke="#087e60" stroke-width="6" stroke-linecap="round"/>
+  <path d="M20 43V29a9 9 0 0 1 9-9h8M108 85v14a9 9 0 0 1-9 9h-8" fill="none" stroke="#8bddbc" stroke-width="5" stroke-linecap="round"/>
 </svg>
