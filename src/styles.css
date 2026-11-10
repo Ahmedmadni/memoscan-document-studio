@@ -71,8 +71,11 @@
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.58 0.14 162);
   --warning: oklch(0.66 0.15 68);
-  --stage: oklch(0.17 0.02 220);
-  --stage-foreground: oklch(0.97 0.005 95);
+  --stage: oklch(0.19 0.005 160);
+  --stage-foreground: oklch(0.97 0.002 160);
+  --work-surface: oklch(0.24 0.005 160);
+  --work-accent: oklch(0.78 0.17 165);
+  --work-accent-foreground: oklch(0.2 0.02 165);
   --handle: oklch(0.78 0.17 165);
   --border: oklch(0.9 0.008 210);
   --input: oklch(0.88 0.01 210);
@@ -169,7 +172,7 @@
   flex-shrink: 0;
   max-height: 48dvh;
   overflow-y: auto;
-  background: color-mix(in oklch, var(--stage) 96%, black);
+  background: var(--work-surface);
   color: var(--stage-foreground);
   border-top: 1px solid color-mix(in oklch, var(--stage-foreground) 12%, transparent);
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
@@ -191,7 +194,7 @@
 }
 .cs-dock-action:hover,
 .cs-dock-action[aria-pressed="true"] {
-  color: var(--primary);
+  color: var(--work-accent);
   background: color-mix(in oklch, var(--stage-foreground) 10%, transparent);
 }
 
@@ -240,13 +243,46 @@
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  border: 4px solid var(--primary);
+  border: 3px solid var(--work-accent);
   background: transparent;
   color: var(--stage-foreground);
   padding: 5px;
 }
 .camera-shutter:hover {
-  background: var(--primary);
+  background: var(--work-accent);
+}
+.camera-shutter:active {
+  transform: scale(0.94);
+}
+.camera-workspace > header,
+.camera-workspace > footer,
+.camera-controls {
+  background: var(--work-surface);
+}
+.work-confirm,
+.work-tab[aria-pressed="true"] {
+  background: var(--work-accent);
+  color: var(--work-accent-foreground);
+}
+.work-confirm:hover,
+.work-tab[aria-pressed="true"]:hover {
+  background: var(--work-accent);
+  color: var(--work-accent-foreground);
+  opacity: 0.9;
+}
+.work-toolbar {
+  background: var(--work-surface);
+}
+.work-filter {
+  width: 86px;
+  min-height: 72px;
+  border-radius: 6px;
+  white-space: normal;
+}
+.work-filter[aria-pressed="true"] {
+  border-color: var(--work-accent);
+  background: color-mix(in oklch, var(--work-accent) 12%, var(--stage));
+  color: var(--work-accent);
 }
 .camera-shutter-core {
   display: block;
