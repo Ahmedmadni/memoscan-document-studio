@@ -68,22 +68,25 @@ function ScanPage() {
             <img src={scanDesk} alt="" width={1408} height={1024} className="scan-entry-image" />
             <span className="absolute bottom-4 start-4 flex items-center gap-2 rounded-md border bg-card/95 px-3 py-2 text-sm font-semibold text-primary">
               <img src="/memoscan-logo.svg" width={24} height={24} alt="" />
-              {t("appName")} <span className="text-xs font-normal text-muted-foreground">/ {t("scanCaption")}</span>
+              {t("appName")}{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                / {t("scanCaption")}
+              </span>
             </span>
           </div>
           <div className="mx-auto flex max-w-xl flex-col gap-5 py-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">{t("scanCaption")}</p>
-              <h2 className="text-xl font-semibold">{t("selectSource")}</h2>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">{t("scanCaption")}</p>
+                <h2 className="text-xl font-semibold">{t("selectSource")}</h2>
               </div>
               <ShieldCheck className="size-6 text-primary" aria-hidden="true" />
             </div>
             <div className="scan-source-controls">
-            <ImagePickers
-              onFiles={(files, edits) => void startWith(files, edits)}
-              disabled={!!busy}
-            />
+              <ImagePickers
+                onFiles={(files, edits) => void startWith(files, edits)}
+                disabled={!!busy}
+              />
             </div>
             {busy && (
               <p role="status" className="flex items-center gap-2 text-sm text-primary">

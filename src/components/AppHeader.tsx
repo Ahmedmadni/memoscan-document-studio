@@ -17,11 +17,14 @@ export function AppHeader({ start }: { start?: ReactNode }) {
     <header className="brand-header sticky top-0 z-30 bg-card/95 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-5">
         {start}
-        <Link
-          to="/"
-          className="flex shrink-0 items-center gap-2.5 font-display text-2xl font-bold"
-        >
-          <img src="/memoscan-logo.svg" alt="" width={40} height={40} className="brand-mark size-10" />
+        <Link to="/" className="flex shrink-0 items-center gap-2.5 font-display text-2xl font-bold">
+          <img
+            src="/memoscan-logo.svg"
+            alt=""
+            width={40}
+            height={40}
+            className="brand-mark size-10"
+          />
           {t("appName")}
         </Link>
         <nav aria-label={t("primaryNav")} className="ms-8 hidden items-center gap-1 md:flex">
@@ -53,7 +56,12 @@ export function AppHeader({ start }: { start?: ReactNode }) {
               <ExternalLink />
             </a>
           </Button>
-          <Button variant="ghost" onClick={toggle} aria-label="Language / اللغة" className="gap-1.5 px-2.5 text-xs text-muted-foreground">
+          <Button
+            variant="ghost"
+            onClick={toggle}
+            aria-label="Language / اللغة"
+            className="gap-1.5 px-2.5 text-xs text-muted-foreground"
+          >
             <Languages />
             {t("langToggle")}
           </Button>
