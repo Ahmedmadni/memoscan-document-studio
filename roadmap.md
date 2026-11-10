@@ -2,8 +2,8 @@
 
 ## Visual identity refinement
 
-- [ ] Refine shared colors, navigation and headings; refresh home and scan presentation without changing workflows.
-- [ ] Check mobile/desktop Arabic and English layouts and run existing regressions.
+- [x] Refine shared colors, navigation and headings; refresh home and scan presentation without changing workflows.
+- [x] Check mobile/desktop Arabic and English layouts and run existing regressions (87 tests; browser import and PDF creation verified).
 
 - [x] Preserve separate feature pages, bilingual identity, library search and sorting.
 - [x] Finish small mobile layout adjustments and verify Arabic/English pages.
