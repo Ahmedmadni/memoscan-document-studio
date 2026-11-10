@@ -27,3 +27,5 @@
 - Camera uses one persistent WebView stream with capability-gated controls and an explicit per-page approval queue; native portrait locking uses Capacitor and releases on close so other workflows retain their orientation.
 - Camera review retains edits against the original capture until approval; shared processPage applies filters and optional contour correction so preview and imported pixels use the same pipeline.
 - Curved-edge correction is opt-in and confidence-gated to mild light-paper side contours; legacy settings omit the flag safely and never imply general 3D dewarping.
+
+- Shared navigation and page headings use global semantic identity tokens; scanning and signing keep distinct accent roles so branding stays consistent without coupling their workflows.
