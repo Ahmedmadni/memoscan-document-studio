@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   Crop,
   FileText,
@@ -226,9 +225,14 @@ export function PageEditor({
   const activeCornerPt = activeDragIdx !== null ? displayCorners[activeDragIdx] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stage text-stage-foreground">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-stage text-stage-foreground"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("editSelectedPage")}
+    >
       {/* CamScanner Dark Top Stepper Bar */}
-      <div className="work-toolbar flex shrink-0 flex-wrap items-center gap-1 border-b border-stage-foreground/15 px-2 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))]">
+      <div className="work-toolbar flex shrink-0 items-center gap-1 border-b border-stage-foreground/15 px-2 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))]">
         <Button
           variant="ghost"
           size="icon"
@@ -244,7 +248,7 @@ export function PageEditor({
           <Button
             variant="ghost"
             size="sm"
-            className={`work-tab h-9 rounded-md px-2 text-xs ${
+            className={`work-tab h-9 gap-1 rounded-md px-2 text-xs ${
               tab === "corners"
                 ? "bg-primary text-primary-foreground"
                 : "text-stage-foreground/75 hover:text-stage-foreground"
@@ -253,13 +257,13 @@ export function PageEditor({
             aria-pressed={tab === "corners"}
             onClick={() => setTab("corners")}
           >
-            <Crop className="me-1 size-3.5" />
+            <Crop className="hidden min-[360px]:block" />
             1. {t("corners")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className={`work-tab h-9 rounded-md px-2 text-xs ${
+            className={`work-tab h-9 gap-1 rounded-md px-2 text-xs ${
               tab === "adjust"
                 ? "bg-primary text-primary-foreground"
                 : "text-stage-foreground/75 hover:text-stage-foreground"
@@ -268,12 +272,12 @@ export function PageEditor({
             aria-pressed={tab === "adjust"}
             onClick={() => setTab("adjust")}
           >
-            <Sparkles className="me-1 size-3.5" />
+            <Sparkles className="hidden min-[360px]:block" />
             2. {t("adjust")}
           </Button>
         </div>
 
-        <div className="ms-auto flex items-center gap-1">
+        <div className="ms-auto flex shrink-0 items-center">
           <Button
             variant="ghost"
             size="icon"
@@ -302,7 +306,12 @@ export function PageEditor({
         className="relative flex min-h-0 flex-1 items-center justify-center bg-stage p-4 [container-type:size]"
         dir="ltr"
       >
-        {!src && <Loader2 className="size-8 animate-spin text-stage-foreground" />}
+        {(!src || (tab === "adjust" && !after)) && (
+          <Loader2
+            aria-label={t("loading")}
+            className="size-8 animate-spin text-stage-foreground"
+          />
+        )}
         {src && tab === "corners" && (
           <div ref={box} className="relative touch-none select-none">
             <img
@@ -382,16 +391,26 @@ export function PageEditor({
       </div>
 
       {/* CamScanner Bottom Dock */}
-      <div className="cs-bottom-dock space-y-3 px-4 pt-3">
+      <div className="cs-bottom-dock px-3 pt-2">
         {tab === "corners" ? (
-          <>
+          <div className="space-y-2 overflow-y-auto">
             <p className="text-center text-xs text-stage-foreground/70">{t("dragHint")}</p>
             <div className="mx-auto grid max-w-lg grid-cols-5 items-stretch gap-1">
-              <Button variant="ghost" title={t("rotateL")} className="cs-dock-action h-auto whitespace-normal" onClick={() => rot(-90)}>
+              <Button
+                variant="ghost"
+                title={t("rotateL")}
+                className="cs-dock-action h-auto whitespace-normal"
+                onClick={() => rot(-90)}
+              >
                 <RotateCcw className="size-5" />
                 <span>{t("rotateL")}</span>
               </Button>
-              <Button variant="ghost" title={t("rotateR")} className="cs-dock-action h-auto whitespace-normal" onClick={() => rot(90)}>
+              <Button
+                variant="ghost"
+                title={t("rotateR")}
+                className="cs-dock-action h-auto whitespace-normal"
+                onClick={() => rot(90)}
+              >
                 <RotateCw className="size-5" />
                 <span>{t("rotateR")}</span>
               </Button>
@@ -425,108 +444,69 @@ export function PageEditor({
                 <span>{t("next")}</span>
               </Button>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-3">
-            {/* Horizontal CamScanner Filter Swatch Strip */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {FILTERS.map(([f, k, Icon]) => (
-                <Button
-                  variant="ghost"
-                  key={f}
-                  aria-pressed={s.filter === f}
-                  onClick={() => update({ filter: f }, "f" + Date.now())}
-                  className="work-filter camera-tool flex h-auto shrink-0 flex-col items-center gap-2 border border-stage-foreground/15 px-2 py-2 text-xs"
-                >
-                  <Icon aria-hidden="true" className="size-5" />
-                  <span className="text-center font-medium leading-tight">{t(k)}</span>
-                </Button>
-              ))}
-            </div>
+          <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-col gap-2">
+            <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain px-0.5">
+              {fineOpen ? (
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-stage-foreground/15 bg-stage-foreground/5 p-2">
+                  {slider("brightness", "brightness", -100, 100)}
+                  {slider("contrast", "contrast", -100, 100)}
+                  {s.filter === "bw" || s.filter === "text"
+                    ? slider("threshold", "threshold", 0, 30)
+                    : slider("sharpen", "sharpen", 0, 100)}
+                  {slider("angle", "deskew", -15, 15, 0.5)}
+                  <label className="col-span-2 block text-xs">
+                    {t("compare")}
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={split}
+                      onChange={(e) => setSplit(+e.target.value)}
+                      className="mt-1 w-full accent-handle"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {FILTERS.map(([f, k, Icon]) => (
+                    <Button
+                      variant="ghost"
+                      key={f}
+                      aria-pressed={s.filter === f}
+                      onClick={() => update({ filter: f }, "f" + Date.now())}
+                      className="work-filter camera-tool flex h-auto shrink-0 flex-col items-center gap-1 border border-stage-foreground/15 px-2 py-2 text-xs"
+                    >
+                      <Icon aria-hidden="true" className="size-5" />
+                      <span className="text-center font-medium leading-tight">{t(k)}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
 
-            <label className="flex items-center justify-between gap-3 text-xs">
-              {t("curvedEdges")}
-              <Switch
-                aria-label={t("curvedEdges")}
-                checked={s.curvedEdges ?? false}
-                onCheckedChange={(checked) => update({ curvedEdges: checked }, "curvedEdges")}
-              />
-            </label>
-            {fineOpen && (
-              <div className="grid gap-3 rounded-xl border border-stage-foreground/15 bg-stage-foreground/5 p-3 sm:grid-cols-2">
-                {slider("angle", "deskew", -15, 15, 0.5)}
-                {slider("brightness", "brightness", -100, 100)}
-                {slider("contrast", "contrast", -100, 100)}
-                {s.filter === "bw" || s.filter === "text"
-                  ? slider("threshold", "threshold", 0, 30)
-                  : slider("sharpen", "sharpen", 0, 100)}
-                <label className="block text-xs sm:col-span-2">
-                  {t("compare")}
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={split}
-                    onChange={(e) => setSplit(+e.target.value)}
-                    className="mt-1 w-full accent-accent"
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="flex min-h-8 items-center gap-2 text-xs">
+                  <Switch
+                    aria-label={t("curvedEdges")}
+                    checked={s.curvedEdges ?? false}
+                    onCheckedChange={(checked) => update({ curvedEdges: checked }, "curvedEdges")}
                   />
+                  {t("curvedEdges")}
                 </label>
-              </div>
-            )}
-
-            {/* Bottom Action Bar in Step 2 */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="camera-tool text-xs"
-                  onClick={() => setTab("corners")}
-                >
-                  <ArrowRight className="me-1 size-4 ltr:rotate-180" />
-                  {t("corners")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="camera-tool text-xs"
-                  aria-expanded={fineOpen}
-                  onClick={() => setFineOpen((o) => !o)}
-                >
-                  <SlidersHorizontal className="me-1 size-4" />
-                  {t("editSelectedPage")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="camera-tool"
-                  aria-label={t("rotateL")}
-                  onClick={() => rot(-90)}
-                >
-                  <RotateCcw className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="camera-tool"
-                  aria-label={t("rotateR")}
-                  onClick={() => rot(90)}
-                >
-                  <RotateCw className="size-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {onApplyAll && (
+                {onApplyAll && !fineOpen && (
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
-                    disabled={saving}
+                    className="camera-tool h-auto min-h-9 whitespace-normal border border-stage-foreground/15"
+                    disabled={saving || !src}
                     onClick={async () => {
                       setSaving(true);
                       try {
                         await onApplyAll(s.filter);
                         toast.success(t("appliedToAll"));
+                      } catch {
+                        toast.error(t("errGeneric"));
                       } finally {
                         setSaving(false);
                       }
@@ -535,15 +515,45 @@ export function PageEditor({
                     {t("applyToAllPagesBtn")}
                   </Button>
                 )}
-                <Button onClick={save} disabled={saving || !src} size="sm" className="work-confirm min-h-11 px-5">
-                  {saving ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Check className="me-1 size-4" />
-                  )}
-                  {t("save")}
-                </Button>
               </div>
+            </div>
+
+            <div className="grid shrink-0 grid-cols-[auto_auto_1fr_auto] items-stretch gap-1 border-t border-stage-foreground/15 pt-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="camera-tool size-11"
+                aria-label={t("rotateL")}
+                onClick={() => rot(-90)}
+              >
+                <RotateCcw />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="camera-tool size-11"
+                aria-label={t("rotateR")}
+                onClick={() => rot(90)}
+              >
+                <RotateCw />
+              </Button>
+              <Button
+                variant="ghost"
+                className="camera-tool h-auto min-h-11 whitespace-normal border border-stage-foreground/15 px-2 text-xs aria-expanded:bg-stage-foreground/15"
+                aria-expanded={fineOpen}
+                onClick={() => setFineOpen((o) => !o)}
+              >
+                {fineOpen ? <Sparkles /> : <SlidersHorizontal />}
+                {t(fineOpen ? "filters" : "editSelectedPage")}
+              </Button>
+              <Button
+                onClick={save}
+                disabled={saving || !src}
+                className="work-confirm h-auto min-h-11 px-3"
+              >
+                {saving ? <Loader2 className="animate-spin" /> : <Check />}
+                {t("save")}
+              </Button>
             </div>
           </div>
         )}

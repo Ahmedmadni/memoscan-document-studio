@@ -3,7 +3,7 @@ import {
   Check,
   Grid3X3,
   ImagePlus,
-  Minus,
+  Trash2,
   X,
   SwitchCamera,
   Zap,
@@ -59,6 +59,7 @@ export function ImagePickers({
   const [approved, setApproved] = useState<Set<File>>(new Set());
   const lib = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const selectedReviewButton = useRef<HTMLButtonElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const captureRevision = useRef(0);
   const [capturing, setCapturing] = useState(false);
@@ -81,6 +82,10 @@ export function ImagePickers({
     reviewPreview?.file === reviewFile && reviewPreview.settings === selectedSettings
       ? reviewPreview.url
       : null;
+  useEffect(() => {
+    if (reviewFile)
+      selectedReviewButton.current?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [reviewFile]);
   useEffect(() => {
     if (!reviewFile || !selectedSettings) return;
     let active = true;
@@ -306,7 +311,7 @@ export function ImagePickers({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="image-source-buttons flex flex-wrap gap-2">
         <Button
           size={size}
           className="min-h-14 gap-3 px-7 shadow-paper"
@@ -336,10 +341,10 @@ export function ImagePickers({
 
       {cameraOpen && (
         <div
-          className="camera-workspace fixed inset-0 z-[70] flex flex-col bg-stage text-stage-foreground"
+          className="camera-workspace fixed inset-0 z-[70] flex flex-col overflow-hidden bg-stage text-stage-foreground"
           role="dialog"
           aria-modal="true"
-          aria-label={t("scanCamera")}
+          aria-label={t(reviewFile ? "cameraReview" : "scanCamera")}
         >
           <header className="flex items-center justify-between gap-3 border-b border-stage-foreground/15 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div>
@@ -360,11 +365,11 @@ export function ImagePickers({
           </header>
 
           {!reviewFile && (
-            <div className="camera-controls flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 py-2">
+            <div className="camera-controls flex shrink-0 flex-wrap items-center justify-center gap-1 px-2 py-1.5">
               <Button
                 size="icon"
                 variant="ghost"
-                className="camera-tool"
+                className="camera-tool size-11"
                 disabled={!cameraReady || !controls.torch || controlBusy}
                 title={t(controls.torch ? (torch ? "torchOff" : "torchOn") : "torchUnavailable")}
                 aria-label={t(
@@ -378,7 +383,7 @@ export function ImagePickers({
               <Button
                 size="icon"
                 variant="ghost"
-                className="camera-tool"
+                className="camera-tool size-11"
                 disabled={!cameraReady || capturing || controlBusy}
                 title={t("switchCamera")}
                 aria-label={t("switchCamera")}
@@ -393,7 +398,7 @@ export function ImagePickers({
               <Button
                 size="icon"
                 variant="ghost"
-                className="camera-tool"
+                className="camera-tool size-11"
                 title={t("cameraGrid")}
                 aria-label={t("cameraGrid")}
                 aria-pressed={showGrid}
@@ -402,7 +407,7 @@ export function ImagePickers({
                 <Grid3X3 />
               </Button>
               {controls.zoom && (
-                <label className="flex min-w-0 items-center gap-2 text-xs">
+                <label className="flex min-w-28 max-w-48 flex-1 items-center gap-1.5 px-1 text-xs">
                   {t("cameraZoom")}
                   <input
                     type="range"
@@ -413,9 +418,11 @@ export function ImagePickers({
                     value={zoom}
                     disabled={controlBusy}
                     onChange={(e) => void changeControl("zoom", Number(e.target.value))}
-                    className="w-24 accent-primary"
+                    className="min-w-12 flex-1 accent-handle"
                   />
-                  <span dir="ltr">{zoom.toFixed(1)}×</span>
+                  <span className="shrink-0 tabular-nums" dir="ltr">
+                    {zoom.toFixed(1)}×
+                  </span>
                 </label>
               )}
             </div>
@@ -468,29 +475,37 @@ export function ImagePickers({
 
           {reviewFile && (
             <>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 py-3">
-                <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2">
-                  <p className="flex items-center gap-2 text-xs font-medium text-stage-foreground/75">
+              <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-1">
+                <p className="flex shrink-0 items-center justify-between gap-2 text-xs font-medium text-stage-foreground/80">
+                  <span>
                     {t("selectedPagePreview")} · {captured.indexOf(reviewFile) + 1}
-                    <span className="text-handle">{approved.size}/{captured.length}</span>
-                  </p>
+                  </span>
+                  <span
+                    className="rounded-md bg-handle/10 px-2 py-1 tabular-nums text-handle"
+                    dir="ltr"
+                  >
+                    {approved.size}/{captured.length}
+                  </span>
+                </p>
+                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-black/20">
                   {selectedPreview ? (
                     <img
                       src={selectedPreview}
                       alt={t("page")}
-                      className="min-h-0 max-h-full max-w-full flex-1 object-contain"
+                      className="absolute inset-0 size-full object-contain"
                     />
                   ) : (
                     !cameraError && <p role="status">{t("loading")}</p>
                   )}
                 </div>
                 <ol
-                  className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto"
+                  className="flex shrink-0 items-center gap-2 overflow-x-auto p-0.5"
                   aria-label={t("cameraReview")}
                 >
                   {captured.map((file, index) => (
                     <li key={file.name} className="shrink-0">
                       <Button
+                        ref={file === reviewFile ? selectedReviewButton : undefined}
                         variant="ghost"
                         className="camera-tool h-11 gap-2 rounded-md border border-stage-foreground/15 px-3 data-[selected=true]:border-handle data-[selected=true]:bg-handle/10"
                         aria-pressed={file === reviewFile}
@@ -504,20 +519,28 @@ export function ImagePickers({
                   ))}
                 </ol>
               </div>
-              <div className="flex shrink-0 items-center justify-center gap-2 border-t border-stage-foreground/15 px-3 py-2">
+              {cameraError && (
+                <p
+                  role="alert"
+                  className="shrink-0 px-3 py-1 text-center text-sm text-stage-foreground"
+                >
+                  {cameraError}
+                </p>
+              )}
+              <div className="work-toolbar grid shrink-0 grid-cols-[1fr_auto_1.1fr] items-stretch gap-2 border-t border-stage-foreground/15 px-3 py-2">
                 <Button
                   variant="ghost"
-                  className="camera-tool"
-                  size="icon"
+                  className="camera-tool h-auto min-h-11 whitespace-normal border border-stage-foreground/15 px-2"
                   aria-label={t("edit")}
                   title={t("edit")}
                   onClick={() => setEditingReview(true)}
                 >
                   <SlidersHorizontal />
+                  {t("edit")}
                 </Button>
                 <Button
                   variant="ghost"
-                  className="camera-tool"
+                  className="camera-tool size-11"
                   size="icon"
                   aria-label={t("removeCaptured")}
                   title={t("removeCaptured")}
@@ -540,30 +563,25 @@ export function ImagePickers({
                     else setReviewFile(null);
                   }}
                 >
-                  <Minus />
+                  <Trash2 />
                 </Button>
                 <Button
                   disabled={approved.has(reviewFile) || !selectedPreview}
                   onClick={acceptReview}
-                  className="work-confirm min-h-11 flex-1 sm:flex-none"
+                  className="work-confirm h-auto min-h-11 whitespace-normal px-2"
                 >
                   <Check />
                   {t(approved.has(reviewFile) ? "approvedPage" : "approvePage")}
                 </Button>
-                {cameraError && (
-                  <p role="alert" className="w-full text-center text-destructive-foreground">
-                    {cameraError}
-                  </p>
-                )}
               </div>
             </>
           )}
           <footer className="shrink-0 border-t border-stage-foreground/15 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {reviewFile ? (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-[1fr_1.25fr] gap-2">
                 <Button
                   variant="ghost"
-                  className="camera-tool"
+                  className="camera-tool h-auto min-h-11 whitespace-normal border border-stage-foreground/15 px-2"
                   onClick={() => {
                     setReviewFile(null);
                     setCameraError("");
@@ -572,7 +590,11 @@ export function ImagePickers({
                   <Camera />
                   {t("resumeCapture")}
                 </Button>
-                <Button className="work-confirm min-h-11 whitespace-normal" disabled={!batchApproved(captured, approved)} onClick={acceptCaptured}>
+                <Button
+                  className="work-confirm h-auto min-h-11 whitespace-normal px-2"
+                  disabled={!batchApproved(captured, approved)}
+                  onClick={acceptCaptured}
+                >
                   <Check />
                   {t("finishBatch")} ({approved.size}/{captured.length})
                 </Button>
@@ -580,7 +602,7 @@ export function ImagePickers({
             ) : (
               <>
                 <div
-                  className="mb-3 flex justify-center"
+                  className="mb-2 flex justify-center gap-1"
                   role="group"
                   aria-label={t("captureMode")}
                 >
@@ -602,7 +624,9 @@ export function ImagePickers({
                   <span role="status" className="text-center text-[11px] text-stage-foreground/65">
                     {t("capturedPages")}
                     <br />
-                    <span className="text-lg font-semibold tabular-nums text-stage-foreground">{captured.length}</span>
+                    <span className="text-lg font-semibold tabular-nums text-stage-foreground">
+                      {captured.length}
+                    </span>
                   </span>
                   <Button
                     aria-label={t("capturePage")}

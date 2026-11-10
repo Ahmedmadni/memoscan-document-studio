@@ -169,9 +169,11 @@
 
 /* CamScanner Bottom Dock & Stepper Styles */
 .cs-bottom-dock {
-  flex-shrink: 0;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
   max-height: 48dvh;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--work-surface);
   color: var(--stage-foreground);
   border-top: 1px solid color-mix(in oklch, var(--stage-foreground) 12%, transparent);
@@ -231,6 +233,8 @@
   height: min(100cqh, calc(100cqw * 4 / 3));
   margin: auto;
   overflow: hidden;
+  border-radius: 0.75rem;
+  outline: 1px solid color-mix(in oklch, var(--stage-foreground) 18%, transparent);
 }
 .camera-tool {
   color: var(--stage-foreground);
@@ -274,8 +278,8 @@
   background: var(--work-surface);
 }
 .work-filter {
-  width: 86px;
-  min-height: 72px;
+  width: 80px;
+  min-height: 60px;
   border-radius: 6px;
   white-space: normal;
 }
@@ -350,13 +354,13 @@
   object-fit: cover;
   object-position: center 48%;
 }
-.scan-source-controls > div {
+.scan-source-controls > .image-source-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   width: 100%;
 }
-.scan-source-controls > div > button {
+.scan-source-controls > .image-source-buttons > button {
   min-height: 64px;
   padding-inline: 16px;
   border-radius: 8px;

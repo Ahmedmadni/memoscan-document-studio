@@ -163,6 +163,8 @@ const dict = {
   },
   autoAnalyzePage: { ar: "تحليل بيانات الصفحات", en: "Analyze page metadata" },
   selectedPagePreview: { ar: "معاينة الصفحة المحددة", en: "Selected page preview" },
+  filters: { ar: "الفلاتر", en: "Filters" },
+  pageActions: { ar: "خيارات الصفحة", en: "Page options" },
   editSelectedPage: { ar: "ضبط الصفحة", en: "Adjust page" },
   zatcaTitle: { ar: "قارئ الفواتير الإلكترونية", en: "E-invoice QR reader" },
   zatcaPlaceholder: { ar: "الصق محتوى رمز QR", en: "Paste the QR code payload" },

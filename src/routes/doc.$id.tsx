@@ -25,6 +25,7 @@ import {
   FileText,
   GripVertical,
   Loader2,
+  MoreHorizontal,
   Pencil,
   RefreshCw,
   Share2,
@@ -38,6 +39,13 @@ import { InvoiceQrReader } from "@/components/InvoiceQrReader";
 import { ImagePickers } from "@/components/ImagePickers";
 import { PageEditor } from "@/components/PageEditor";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import {
   getDoc,
@@ -354,32 +362,36 @@ function DocPage() {
           </p>
         ) : (
           <>
-            {/* CamScanner Quick Batch Filter Bar */}
-            <div className="flex items-center gap-2 overflow-x-auto border-y py-3">
-              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-primary">
+            <section
+              className="space-y-2 rounded-lg border bg-card p-3"
+              aria-label={t("batchFilterLabel")}
+            >
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold text-primary">
                 <Sparkles className="size-4" />
-                {t("batchFilterLabel")}:
-              </span>
-              {BATCH_FILTERS.map(([f, labelKey]) => (
-                <Button
-                  variant="outline"
-                  key={f}
-                  disabled={!!busy}
-                  onClick={() =>
-                    void run(t("processing"), async () => {
-                      await applyFilterToAllPages(doc.id, f, (a, b) =>
-                        setBusy(`${t("processing")} ${a}/${b}`),
-                      );
-                      await load();
-                      toast.success(t("appliedToAll"));
-                    })
-                  }
-                  className="shrink-0 text-xs"
-                >
-                  {t(labelKey)}
-                </Button>
-              ))}
-            </div>
+                {t("batchFilterLabel")}
+              </h2>
+              <div className="flex gap-2 overflow-x-auto p-0.5">
+                {BATCH_FILTERS.map(([f, labelKey]) => (
+                  <Button
+                    variant="outline"
+                    key={f}
+                    disabled={!!busy}
+                    onClick={() =>
+                      void run(t("processing"), async () => {
+                        await applyFilterToAllPages(doc.id, f, (a, b) =>
+                          setBusy(`${t("processing")} ${a}/${b}`),
+                        );
+                        await load();
+                        toast.success(t("appliedToAll"));
+                      })
+                    }
+                    className="shrink-0 text-xs"
+                  >
+                    {t(labelKey)}
+                  </Button>
+                ))}
+              </div>
+            </section>
             <p className="text-xs text-muted-foreground">{t("reorderHint")}</p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={ids} strategy={rectSortingStrategy}>
@@ -484,10 +496,7 @@ function DocPage() {
         )}
 
         {pages.length > 0 && (
-          <section
-            ref={exportSectionRef}
-            className="scroll-mt-20 space-y-3 border-t pt-5"
-          >
+          <section ref={exportSectionRef} className="scroll-mt-20 space-y-3 border-t pt-5">
             <h2 className="text-lg font-semibold">{t("exportTitle")}</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <ExportSelect
@@ -663,7 +672,8 @@ function SortablePageCard({
       }`}
     >
       <div className="relative">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           className="relative flex h-72 w-full items-center justify-center rounded-none bg-muted p-4 hover:bg-muted"
           onClick={onEdit}
           aria-label={`${t("edit")} ${i + 1}`}
@@ -673,7 +683,9 @@ function SortablePageCard({
             {numStr}
           </span>
         </Button>
-        <Button variant="ghost" size="icon"
+        <Button
+          variant="ghost"
+          size="icon"
           {...attributes}
           {...listeners}
           aria-label={`${t("dragToReorder")} ${i + 1}`}
@@ -690,25 +702,41 @@ function SortablePageCard({
       >
         {p.autoDetected ? t("autoBadge") : t("manualBadge")}
       </p>
-      <div className="flex flex-wrap justify-center p-1">
-        <IconBtn label={t("edit")} onClick={onEdit}>
+      <div className="flex items-center justify-between gap-2 p-2.5">
+        <Button variant="secondary" className="min-h-11" onClick={onEdit}>
           <Pencil />
-        </IconBtn>
-        <IconBtn label={t("moveEarlier")} disabled={i === 0} onClick={() => onMove(-1)}>
-          <ChevronUp />
-        </IconBtn>
-        <IconBtn label={t("moveLater")} disabled={i === total - 1} onClick={() => onMove(1)}>
-          <ChevronDown />
-        </IconBtn>
-        <IconBtn label={t("duplicate")} onClick={onDuplicate}>
-          <Copy />
-        </IconBtn>
-        <IconBtn label={t("replace")} onClick={onReplace}>
-          <RefreshCw />
-        </IconBtn>
-        <IconBtn label={t("delete")} onClick={onDelete}>
-          <Trash2 className="text-destructive" />
-        </IconBtn>
+          {t("edit")}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11"
+              aria-label={`${t("pageActions")} ${i + 1}`}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem disabled={i === 0} onSelect={() => onMove(-1)}>
+              <ChevronUp /> {t("moveEarlier")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={i === total - 1} onSelect={() => onMove(1)}>
+              <ChevronDown /> {t("moveLater")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDuplicate}>
+              <Copy /> {t("duplicate")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onReplace}>
+              <RefreshCw /> {t("replace")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onSelect={onDelete}>
+              <Trash2 /> {t("delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </li>
   );
@@ -720,23 +748,6 @@ function Shell({ children }: { children: React.ReactNode }) {
       <AppHeader />
       <main className="mx-auto max-w-5xl space-y-3 px-4 py-10">{children}</main>
     </div>
-  );
-}
-
-function IconBtn({
-  label,
-  children,
-  ...rest
-}: {
-  label: string;
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Button variant="ghost" size="icon" aria-label={label} title={label} {...rest}>
-      {children}
-    </Button>
   );
 }
 
