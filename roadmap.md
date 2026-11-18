@@ -11,6 +11,7 @@
 - [x] Pin the previously successful Bun version and check formatting/types without rewriting source during CI.
 - [ ] Add per-stroke signature undo/eraser and adjustable smoothing.
 - [ ] Add on-device OCR and an invoice history/export workflow.
+- [ ] Resolve Android signing continuity before distributing an installed-app update. Verified builds 119 and 120 use different debug signing certificates; build 120 is for a separate test device.
 - [ ] Verify current production camera, storage and sharing flows on a physical Android phone. Local browser automation is currently blocked by Chromium's process socket restriction; automated component/storage regressions are available.
 
 ## Visual identity refinement
