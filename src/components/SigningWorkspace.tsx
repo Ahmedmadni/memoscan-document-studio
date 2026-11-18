@@ -7,9 +7,13 @@ import {
   FileSignature,
   ImagePlus,
   Pin,
+  Maximize2,
+  Minimize2,
+  Redo2,
   ShieldCheck,
   Stamp,
   Trash2,
+  Undo2,
   Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -27,7 +31,6 @@ import {
   createOfficialStamp,
   createSignedPdf,
   displaySize,
-  hasSignatureInk,
   INITIAL_PLACEMENT,
   listSavedSignatures,
   loadSigningPdf,
@@ -40,6 +43,14 @@ import {
   type SignatureImage,
   type StampPreset,
 } from "@/lib/signature";
+import {
+  drawInk,
+  hitInkPath,
+  inkBounds,
+  type InkPath,
+  type InkPoint,
+  type Smoothing,
+} from "@/lib/signature-ink";
 import { toast } from "sonner";
 
 const INK_COLORS = [
@@ -49,20 +60,23 @@ const INK_COLORS = [
   { id: "green", value: "#15803d", labelKey: "inkGreen" as const },
 ];
 
-type InkPoint = { x: number; y: number };
-
 type InkStroke = {
   canvas: HTMLCanvasElement;
   pointerId: number;
-  last: InkPoint;
-  end: InkPoint;
+  path: InkPath;
   minDistance: number;
 };
 
 function inkPoint(event: PointerEvent, canvas: HTMLCanvasElement, bounds: DOMRect): InkPoint {
   return {
-    x: ((event.clientX - bounds.left) * canvas.width) / bounds.width,
-    y: ((event.clientY - bounds.top) * canvas.height) / bounds.height,
+    x: Math.max(
+      0,
+      Math.min(canvas.width, ((event.clientX - bounds.left) * canvas.width) / bounds.width),
+    ),
+    y: Math.max(
+      0,
+      Math.min(canvas.height, ((event.clientY - bounds.top) * canvas.height) / bounds.height),
+    ),
   };
 }
 
@@ -80,6 +94,12 @@ export function SigningWorkspace() {
   const [mode, setMode] = useState<"draw" | "image" | "stamp">("draw");
   const [inkColor, setInkColor] = useState("#142b55");
   const [penWidth, setPenWidth] = useState(3.5);
+  const [smoothing, setSmoothing] = useState<Smoothing>(1);
+  const [inkTool, setInkTool] = useState<"pen" | "eraser">("pen");
+  const [expandedInk, setExpandedInk] = useState(false);
+  const [paths, setPaths] = useState<InkPath[]>([]);
+  const [past, setPast] = useState<InkPath[][]>([]);
+  const [future, setFuture] = useState<InkPath[][]>([]);
   const [opacity, setOpacity] = useState(0.95);
   const [autoRemoveBg, setAutoRemoveBg] = useState(true);
   const [stampPreset, setStampPreset] = useState<StampPreset>("approved");
@@ -100,6 +120,54 @@ export function SigningWorkspace() {
   const revision = useRef({ pdf: 0, image: 0 });
   const page = pdf?.pages[pageIndex];
   const safe = page && signature ? clampPlacement(placement, signature.aspect, page) : placement;
+
+  function paint(pathsToDraw: InkPath[], strength = smoothing) {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawInk(ctx, pathsToDraw, strength);
+  }
+
+  function updateInk(next: InkPath[], strength = smoothing) {
+    setPaths(next);
+    paint(next, strength);
+    const canvas = canvasRef.current;
+    if (!canvas || !next.length) {
+      setSignature(null);
+      return;
+    }
+    const crop = inkBounds(next, strength, canvas.width, canvas.height);
+    const source = canvas.getContext("2d");
+    const trimmed = document.createElement("canvas");
+    trimmed.width = crop.width;
+    trimmed.height = crop.height;
+    const target = trimmed.getContext("2d");
+    if (!source || !target) return;
+    target.putImageData(source.getImageData(crop.x, crop.y, crop.width, crop.height), 0, 0);
+    setSignature({ data: trimmed.toDataURL("image/png"), aspect: trimmed.height / trimmed.width });
+    setError(null);
+  }
+
+  function commitInk(next: InkPath[]) {
+    setPast([...past, paths].slice(-50));
+    setFuture([]);
+    updateInk(next);
+  }
+
+  function undoInk() {
+    if (!past.length) return;
+    setFuture([paths, ...future]);
+    setPast(past.slice(0, -1));
+    updateInk(past[past.length - 1]);
+  }
+
+  function redoInk() {
+    if (!future.length) return;
+    setPast([...past, paths].slice(-50));
+    setFuture(future.slice(1));
+    updateInk(future[0]);
+  }
 
   useEffect(() => {
     setVault(listSavedSignatures());
@@ -181,34 +249,33 @@ export function SigningWorkspace() {
 
   function clearDrawing() {
     drawing.current = null;
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-    setSignature(null);
-    setError(null);
+    if (paths.length) commitInk([]);
+    else {
+      setSignature(null);
+      setError(null);
+    }
   }
 
   function startDraw(e: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = e.currentTarget;
     if (e.button !== 0 || drawing.current?.canvas === canvas) return;
     const bounds = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext("2d");
-    if (!ctx || !bounds.width || !bounds.height) return;
+    if (!bounds.width || !bounds.height) return;
 
     const point = inkPoint(e.nativeEvent, canvas, bounds);
     const scale = canvas.width / bounds.width;
+    if (inkTool === "eraser") {
+      const index = hitInkPath(paths, point, 12 * scale, smoothing);
+      if (index >= 0) commitInk(paths.filter((_, i) => i !== index));
+      return;
+    }
     drawing.current = {
       canvas,
       pointerId: e.pointerId,
-      last: point,
-      end: point,
-      minDistance: 1.25 * scale,
+      path: { points: [point], color: inkColor, width: penWidth * scale },
+      minDistance: 0.5 * scale,
     };
     canvas.setPointerCapture?.(e.pointerId);
-    ctx.lineWidth = penWidth * scale;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = inkColor;
-    ctx.fillStyle = inkColor;
     setError(null);
   }
 
@@ -216,28 +283,24 @@ export function SigningWorkspace() {
     const stroke = drawing.current;
     const canvas = e.currentTarget;
     if (!stroke || stroke.pointerId !== e.pointerId || stroke.canvas !== canvas) return;
-    const ctx = canvas.getContext("2d");
     const bounds = canvas.getBoundingClientRect();
-    if (!ctx || !bounds.width || !bounds.height) return;
+    if (!bounds.width || !bounds.height) return;
 
     const event = e.nativeEvent;
     const coalesced = event.getCoalescedEvents?.();
     const samples = coalesced?.length ? coalesced : [event];
-    const previous = stroke.last;
-    ctx.beginPath();
-    ctx.moveTo(stroke.end.x, stroke.end.y);
+    const points = stroke.path.points;
+    const before = points.length;
     for (const sample of samples) {
       const point = inkPoint(sample, canvas, bounds);
-      if (Math.hypot(point.x - stroke.last.x, point.y - stroke.last.y) < stroke.minDistance) {
-        continue;
-      }
-      // Midpoints between samples keep the slope continuous at segment joins.
-      const midpoint = { x: (stroke.last.x + point.x) / 2, y: (stroke.last.y + point.y) / 2 };
-      ctx.quadraticCurveTo(stroke.last.x, stroke.last.y, midpoint.x, midpoint.y);
-      stroke.last = point;
-      stroke.end = midpoint;
+      const last = points[points.length - 1];
+      if (
+        points.length < 2048 &&
+        Math.hypot(point.x - last.x, point.y - last.y) >= stroke.minDistance
+      )
+        points.push(point);
     }
-    if (stroke.last !== previous) ctx.stroke();
+    if (points.length !== before) paint([...paths, stroke.path]);
   }
 
   function endDraw(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -246,26 +309,11 @@ export function SigningWorkspace() {
     if (!stroke || stroke.pointerId !== e.pointerId || stroke.canvas !== canvas) return;
     if (e.type === "pointerup") moveDraw(e);
     drawing.current = null;
-    const ctx = canvas.getContext("2d");
-    if (!ctx || (stroke.last === stroke.end && e.type !== "pointerup")) return;
-
-    ctx.beginPath();
-    if (stroke.last === stroke.end) {
-      // A tap is a dot, which is needed for many Arabic signatures.
-      ctx.arc(stroke.last.x, stroke.last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.moveTo(stroke.end.x, stroke.end.y);
-      ctx.lineTo(stroke.last.x, stroke.last.y);
-      ctx.stroke();
-    }
-
-    if (!hasSignatureInk(ctx.getImageData(0, 0, canvas.width, canvas.height).data)) {
-      setSignature(null);
-      setError(t("signBlank"));
+    if (e.type !== "pointerup") {
+      paint(paths);
       return;
     }
-    setSignature({ data: canvas.toDataURL("image/png"), aspect: canvas.height / canvas.width });
+    commitInk([...paths, stroke.path]);
   }
 
   async function exportPdf() {
@@ -378,7 +426,7 @@ export function SigningWorkspace() {
                 variant={mode === "draw" ? "default" : "outline"}
                 onClick={() => {
                   setMode("draw");
-                  clearDrawing();
+                  if (mode !== "draw") updateInk(paths);
                 }}
               >
                 <FileSignature className="me-2 size-4" />
@@ -421,6 +469,7 @@ export function SigningWorkspace() {
                 variant="outline"
                 onClick={() => {
                   setError(null);
+                  setMode("stamp");
                   setSignature(createDateStampImage(inkColor));
                 }}
               >
@@ -447,56 +496,133 @@ export function SigningWorkspace() {
           </p>
         )}
 
-        {mode === "draw" && (
-          <section className="mb-6 rounded-2xl border bg-card p-4 shadow-paper">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold">{t("signBox")}</h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {INK_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    aria-label={t(c.labelKey)}
-                    title={t(c.labelKey)}
-                    onClick={() => setInkColor(c.value)}
-                    className={`size-6 rounded-full border-2 ${
-                      inkColor === c.value ? "ring-2 ring-primary ring-offset-2" : "border-border"
-                    }`}
-                    style={{ backgroundColor: c.value }}
-                  />
-                ))}
-                <label className="ms-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  {t("penWidth")}
-                  <input
-                    type="range"
-                    min="1.5"
-                    max="7"
-                    step="0.5"
-                    value={penWidth}
-                    onChange={(e) => setPenWidth(Number(e.target.value))}
-                    className="w-20 accent-primary"
-                  />
-                </label>
-                <Button disabled={disabled} size="sm" variant="ghost" onClick={clearDrawing}>
-                  <Eraser className="me-2 size-4" />
-                  {t("clear")}
-                </Button>
-              </div>
+        <section
+          className={
+            mode !== "draw"
+              ? "hidden"
+              : expandedInk
+                ? "fixed inset-0 z-50 overflow-auto bg-background p-4 sm:p-8"
+                : "mb-6 rounded-2xl border bg-card p-4 shadow-paper"
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold">{t("signBox")}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {INK_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-label={t(c.labelKey)}
+                  title={t(c.labelKey)}
+                  disabled={disabled}
+                  onClick={() => {
+                    setInkTool("pen");
+                    setInkColor(c.value);
+                  }}
+                  className={`size-6 rounded-full border-2 ${
+                    inkColor === c.value ? "ring-2 ring-primary ring-offset-2" : "border-border"
+                  }`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+              <label className="ms-2 flex items-center gap-2 text-xs text-muted-foreground">
+                {t("penWidth")}
+                <input
+                  type="range"
+                  disabled={disabled}
+                  min="1.5"
+                  max="7"
+                  step="0.5"
+                  value={penWidth}
+                  onChange={(e) => setPenWidth(Number(e.target.value))}
+                  className="w-20 accent-primary"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                {t("signSmoothing")}
+                <select
+                  aria-label={t("signSmoothing")}
+                  disabled={disabled}
+                  value={smoothing}
+                  onChange={(e) => {
+                    const strength = Number(e.target.value) as Smoothing;
+                    setSmoothing(strength);
+                    updateInk(paths, strength);
+                  }}
+                  className="h-9 rounded-md border bg-background px-2"
+                >
+                  <option value={0}>{t("signSmoothingOff")}</option>
+                  <option value={1}>{t("signSmoothingGentle")}</option>
+                  <option value={2}>{t("signSmoothingStrong")}</option>
+                </select>
+              </label>
+              <Button
+                disabled={disabled}
+                aria-pressed={inkTool === "eraser"}
+                size="sm"
+                variant={inkTool === "eraser" ? "secondary" : "ghost"}
+                onClick={() => setInkTool(inkTool === "pen" ? "eraser" : "pen")}
+              >
+                <Eraser className="me-2 size-4" />
+                {t("signStrokeEraser")}
+              </Button>
+              <Button
+                disabled={disabled || !past.length}
+                aria-label={t("undo")}
+                size="icon"
+                variant="ghost"
+                onClick={undoInk}
+              >
+                <Undo2 className="size-4" />
+              </Button>
+              <Button
+                disabled={disabled || !future.length}
+                aria-label={t("redo")}
+                size="icon"
+                variant="ghost"
+                onClick={redoInk}
+              >
+                <Redo2 className="size-4" />
+              </Button>
+              <Button disabled={disabled} size="sm" variant="ghost" onClick={clearDrawing}>
+                <Trash2 className="me-2 size-4" />
+                {t("clear")}
+              </Button>
+              <Button
+                disabled={disabled}
+                size="sm"
+                variant="outline"
+                onClick={() => setExpandedInk((open) => !open)}
+              >
+                {expandedInk ? (
+                  <Minimize2 className="me-2 size-4" />
+                ) : (
+                  <Maximize2 className="me-2 size-4" />
+                )}
+                {expandedInk ? t("signCloseExpanded") : t("signExpandCanvas")}
+              </Button>
             </div>
+          </div>
+          <div className="mx-auto max-w-5xl overflow-x-auto rounded-xl bg-muted p-2">
             <canvas
               ref={canvasRef}
               aria-label={t("signBox")}
-              width={1152}
-              height={576}
-              className="mx-auto block h-auto w-full max-w-96 touch-none rounded-xl bg-white ring-1 ring-inset ring-border"
+              width={1440}
+              height={900}
+              className={`mx-auto block h-auto w-full touch-none rounded-xl bg-white ring-1 ring-inset ring-border ${expandedInk ? "min-w-[560px] sm:min-w-0" : ""}`}
               onPointerDown={disabled ? undefined : startDraw}
               onPointerMove={moveDraw}
               onPointerUp={endDraw}
               onPointerCancel={endDraw}
               onLostPointerCapture={endDraw}
             />
-          </section>
-        )}
+          </div>
+          {expandedInk && (
+            <p className="mx-auto mt-2 max-w-5xl text-xs text-muted-foreground">
+              {t("signExpandedHint")}
+            </p>
+          )}
+        </section>
 
         {mode === "stamp" && (
           <section className="mb-6 grid gap-4 rounded-2xl border bg-card p-4 shadow-paper sm:grid-cols-3">
@@ -559,7 +685,7 @@ export function SigningWorkspace() {
             <img
               src={signature.data}
               alt={t("signPreview")}
-              className="block h-auto max-h-[min(50dvh,28rem)] w-full rounded-lg border bg-white object-contain p-2"
+              className="block h-auto max-h-[min(65dvh,36rem)] w-full rounded-lg border bg-white object-contain p-2"
             />
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -610,7 +736,7 @@ export function SigningWorkspace() {
                 disabled={disabled}
                 variant="ghost"
                 size="sm"
-                onClick={() => setSignature(null)}
+                onClick={() => (mode === "draw" ? clearDrawing() : setSignature(null))}
               >
                 {t("remove")}
               </Button>
@@ -642,7 +768,10 @@ export function SigningWorkspace() {
                 >
                   <button
                     type="button"
-                    onClick={() => setSignature(item.image)}
+                    onClick={() => {
+                      setMode("image");
+                      setSignature(item.image);
+                    }}
                     className="flex items-center gap-2"
                   >
                     <img

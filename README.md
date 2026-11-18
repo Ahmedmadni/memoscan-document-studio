@@ -21,7 +21,7 @@ Camera drafts persist across reopening with per-page edits/approvals and safe im
    - Optional automatic page numbering (`1 / N`) and diagonal security watermark.
    - Direct **"Sign this PDF" (`توقيع هذا الـ PDF`)** handoff from the scanner workspace straight into the signing studio.
 4. **Signature, Official Stamp & Multi-Overlay Studio**:
-   - Draw signatures in multiple official ink colors (Official Blue `#142b55`, Black, Red, Green) with adjustable pen thickness.
+   - Draw signatures in multiple official ink colors (Official Blue `#142b55`, Black, Red, Green) with adjustable pen thickness, per-stroke undo/redo, an eraser, adjustable smoothing, and an expanded drawing area. Previews crop unused canvas space while keeping small intentional pen dots.
    - **Auto Paper Background Eraser**: import a photographed signature from the gallery and automatically strip the paper background into transparent ink.
    - **Official Electronic Stamps (`أختام رسمية`)**: generate dual-language stamps (`APPROVED / معتمد`, `CERTIFIED COPY / نسخة طبق الأصل`, `CONFIDENTIAL / سري للغاية`, `REVIEWED / تمت المراجعة`) + Date Stamps.
    - **Multi-Overlay Pinning & Opacity**: pin multiple stamps and signatures onto the same PDF page with adjustable ink opacity (`30%..100%`) and local **Signature Vault** persistence.

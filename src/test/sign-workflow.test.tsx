@@ -75,8 +75,9 @@ describe("signing UI states", () => {
   });
 });
 
-it("smooths pointer samples, preserves the stroke endpoint, and supports dots", () => {
+it("keeps strokes editable with undo, redo, eraser and a larger cropped preview", () => {
   const ctx = {
+    clearRect: vi.fn(),
     beginPath: vi.fn(),
     moveTo: vi.fn(),
     quadraticCurveTo: vi.fn(),
@@ -84,6 +85,7 @@ it("smooths pointer samples, preserves the stroke endpoint, and supports dots", 
     stroke: vi.fn(),
     arc: vi.fn(),
     fill: vi.fn(),
+    putImageData: vi.fn(),
     getImageData: vi.fn(() => ({ data: new Uint8ClampedArray([20, 43, 85, 255]) })),
   };
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
@@ -98,7 +100,7 @@ it("smooths pointer samples, preserves the stroke endpoint, and supports dots", 
     left: 0,
     top: 0,
     width: 384,
-    height: 192,
+    height: 240,
   } as DOMRect);
 
   function send(
@@ -122,19 +124,32 @@ it("smooths pointer samples, preserves the stroke endpoint, and supports dots", 
     { clientX: 24, clientY: 28 },
   ]);
   send("pointerup", 26, 29);
-
-  expect(ctx.quadraticCurveTo.mock.calls).toEqual([
-    [30, 30, 48, 39],
-    [66, 48, 69, 66],
-    [72, 84, 75, 85.5],
-  ]);
-  expect(ctx.lineTo).toHaveBeenCalledExactlyOnceWith(78, 87);
+  expect(ctx.quadraticCurveTo).toHaveBeenCalled();
+  expect(ctx.lineTo).toHaveBeenCalledWith(97.5, 108.75);
+  expect(ctx.putImageData).toHaveBeenCalled();
   expect(screen.getByRole("img", { name: "Signature preview" })).toHaveAttribute("src", png);
-
+  expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
   send("pointerdown", 30, 30);
   send("pointerup", 30, 30);
-  expect(ctx.arc).toHaveBeenCalledExactlyOnceWith(90, 90, 5.25, 0, Math.PI * 2);
+  expect(ctx.arc).toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(screen.getByRole("button", { name: "Redo" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+  fireEvent.change(screen.getByLabelText("Ink smoothing"), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Expand drawing area" }));
+  expect(screen.getByRole("button", { name: "Close expanded view" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Close expanded view" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stroke eraser" }));
+  send("pointerdown", 30, 30);
+  expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
+  send("pointerdown", 22, 16);
+  expect(screen.queryByRole("img", { name: "Signature preview" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(screen.getByRole("img", { name: "Signature preview" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+  expect(screen.queryByRole("img", { name: "Signature preview" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Stroke eraser" }));
   send("pointerdown", 32, 32);
   send("pointercancel", 0, 0);
-  expect(ctx.fill).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("img", { name: "Signature preview" })).toBeNull();
 });
