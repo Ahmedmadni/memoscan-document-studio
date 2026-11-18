@@ -29,8 +29,10 @@ export async function buildPage(
   const detection = approvedSettings ? null : detectDocument(src);
   const settings = approvedSettings ?? defaultSettings(detection?.corners);
   const out = processPage(src, settings, MAX_DIM);
-  // Store a re-encoded original (capped size) so re-editing stays fast.
-  const original = await canvasToBlob(src, "image/jpeg", 0.95);
+  // Retain supported source bytes; previews and processing stay bounded separately.
+  const original = /^image\/(jpeg|png|webp|avif|gif|bmp)$/.test(file.type)
+    ? file
+    : await canvasToBlob(src, "image/jpeg", 0.95);
   return {
     id,
     docId,

@@ -1,87 +1,77 @@
-// Soft-delete lifecycle for document pages: a page leaves the order immediately,
-// its record is erased only when the undo window ends, and undo re-inserts it at
-// its original index in the *current* order. All operations are idempotent so
-// duplicate timers, repeated cleanup, or undo-after-finalize are safe no-ops.
-import { deletePage } from "./db";
-import { reinsertAt, removeId } from "./docOps";
+import { deleteDetachedPage, detachPage, restoreDetachedPage, type DocRecord } from "./db";
 
+/** The undo timer starts only after detaching the page commits successfully. */
 export class PendingDeletes {
-  /** pageId -> original index in the order at deletion time. */
-  private pending = new Map<string, number>();
+  private pending = new Map<string, { docId: string; index: number }>();
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  private finalized = new Set<string>();
+  private finalizing = new Map<string, Promise<boolean>>();
   private disposed = false;
 
-  constructor(private timeoutMs = 6000) {}
-
+  constructor(
+    private timeoutMs = 6000,
+    private onError: (error: unknown) => void = () => {},
+  ) {}
   get size() {
     return this.pending.size;
   }
-
   isPending(id: string) {
     return this.pending.has(id);
   }
 
-  /**
-   * Start a soft delete. Returns the new order without the page, or the same
-   * array when the id is unknown or already pending (no duplicate timers).
-   */
-  softDelete(ids: string[], id: string): string[] {
-    if (this.disposed || this.pending.has(id)) return ids;
-    const index = ids.indexOf(id);
-    if (index < 0) return ids;
-    this.pending.set(id, index);
-    this.timers.set(
-      id,
-      setTimeout(() => void this.finalize(id), this.timeoutMs),
-    );
-    return removeId(ids, id);
+  async remove(docId: string, id: string): Promise<DocRecord | null> {
+    if (this.disposed || this.pending.has(id)) return null;
+    const result = await detachPage(docId, id);
+    if (!result) return null;
+    this.pending.set(id, { docId, index: result.index });
+    if (this.disposed) await this.finalize(id);
+    else this.schedule(id);
+    return result.doc;
   }
 
-  /**
-   * Undo a pending delete. Returns the order with the page re-inserted at its
-   * original index (clamped to the current length), or null when there is
-   * nothing to undo (unknown id, already finalized, or already undone).
-   */
-  undo(ids: string[], id: string): string[] | null {
-    const index = this.pending.get(id);
-    if (index === undefined) return null;
-    this.pending.delete(id);
+  async restore(id: string): Promise<DocRecord | null> {
+    const item = this.pending.get(id);
+    if (!item || this.disposed) return null;
     this.clearTimer(id);
-    return reinsertAt(ids, index, id);
-  }
-
-  /**
-   * Permanently erase the page record. Runs at most once per id and never
-   * after an undo or a dispose. Returns true when it actually deleted.
-   */
-  async finalize(id: string): Promise<boolean> {
-    this.clearTimer(id);
-    if (!this.pending.delete(id)) return false;
-    if (this.disposed || this.finalized.has(id)) return false;
-    this.finalized.add(id);
-    await deletePage(id);
-    return true;
-  }
-
-  /**
-   * Unmount cleanup: finalize every pending delete straight to the database
-   * (the undo toast is gone, so keeping the records would orphan them) and
-   * cancel all timers. Never touches React state. Safe to call repeatedly.
-   */
-  dispose() {
-    if (this.disposed) return;
-    this.disposed = true;
-    for (const id of this.timers.keys()) this.clearTimer(id);
-    for (const id of [...this.pending.keys()]) {
+    try {
+      const doc = await restoreDetachedPage(item.docId, id, item.index);
       this.pending.delete(id);
-      if (!this.finalized.has(id)) {
-        this.finalized.add(id);
-        void deletePage(id);
-      }
+      return doc;
+    } catch (error) {
+      if (!this.disposed) this.schedule(id);
+      throw error;
     }
   }
 
+  finalize(id: string): Promise<boolean> {
+    this.clearTimer(id);
+    const existing = this.finalizing.get(id);
+    if (existing) return existing;
+    if (!this.pending.has(id)) return Promise.resolve(false);
+    const task = deleteDetachedPage(id)
+      .then((deleted) => {
+        this.pending.delete(id);
+        return deleted;
+      })
+      .finally(() => this.finalizing.delete(id));
+    this.finalizing.set(id, task);
+    return task;
+  }
+
+  async dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const id of this.timers.keys()) this.clearTimer(id);
+    await Promise.all([...this.pending.keys()].map((id) => this.finalize(id)));
+  }
+  private schedule(id: string) {
+    this.clearTimer(id);
+    this.timers.set(
+      id,
+      setTimeout(() => {
+        void this.finalize(id).catch(this.onError);
+      }, this.timeoutMs),
+    );
+  }
   private clearTimer(id: string) {
     const timer = this.timers.get(id);
     if (timer !== undefined) clearTimeout(timer);

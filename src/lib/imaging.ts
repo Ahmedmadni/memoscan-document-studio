@@ -5,14 +5,7 @@ export type Pt = { x: number; y: number };
 /** Normalized (0..1) corners in order: top-left, top-right, bottom-right, bottom-left. */
 export type Corners = [Pt, Pt, Pt, Pt];
 export type FilterMode =
-  | "original"
-  | "magic"
-  | "enhance"
-  | "gray"
-  | "bw"
-  | "clean"
-  | "paper"
-  | "text";
+  "original" | "magic" | "enhance" | "gray" | "bw" | "clean" | "paper" | "text";
 export type Rotation = 0 | 90 | 180 | 270;
 
 export interface EditSettings {

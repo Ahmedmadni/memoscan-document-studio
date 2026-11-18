@@ -28,145 +28,88 @@ async function seedDoc(ids: string[]) {
   return (await getDoc(doc.id))!;
 }
 
-describe("PendingDeletes integration", () => {
-  // Fake only the timeout timers — fake-indexeddb needs real scheduling.
-  // Enable after seeding so database setup is never stalled.
+describe("PendingDeletes committed lifecycle", () => {
   const fakeTimers = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  afterEach(() => vi.useRealTimers());
-
-  it("restores the page at its original position when undone before the timeout", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+  it("detaches, undoes and keeps both order and image after timeout", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
     fakeTimers();
-    const pd = new PendingDeletes(6000);
-    const next = pd.softDelete(doc.pageIds, "b");
-    expect(next).toEqual(["a", "c"]);
-    await putDoc({ ...doc, pageIds: next });
-
-    const restored = pd.undo(next, "b");
-    expect(restored).toEqual(["a", "b", "c"]);
-    await putDoc({ ...doc, pageIds: restored! });
-
+    const manager = new PendingDeletes();
+    expect((await manager.remove(doc.id, "b"))!.pageIds).toEqual(["a", "c"]);
+    expect((await manager.restore("b"))!.pageIds).toEqual(["a", "b", "c"]);
     await vi.advanceTimersByTimeAsync(10000);
     expect(await getPage("b")).toBeDefined();
-    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "b", "c"]);
-    pd.dispose();
+    await manager.dispose();
   });
-
-  it("permanently removes the page record when the timeout expires", async () => {
-    const doc = await seedDoc(["a", "b", "c"]);
-    fakeTimers();
-    const pd = new PendingDeletes(6000);
-    const next = pd.softDelete(doc.pageIds, "b");
-    await putDoc({ ...doc, pageIds: next });
-
-    await vi.advanceTimersByTimeAsync(6000);
-    expect(await getPage("b")).toBeUndefined();
-    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "c"]);
-    // Undo after finalization is a no-op.
-    expect(pd.undo(next, "b")).toBeNull();
-    pd.dispose();
-  });
-
-  it("restores only the undone page when two deletes are pending", async () => {
-    const doc = await seedDoc(["a", "b", "c"]);
-    fakeTimers();
-    const pd = new PendingDeletes(6000);
-    let order = pd.softDelete(doc.pageIds, "b");
-    order = pd.softDelete(order, "c");
-    expect(order).toEqual(["a"]);
-    await putDoc({ ...doc, pageIds: order });
-
-    const restored = pd.undo(order, "c");
-    expect(restored).toEqual(["a", "c"]);
-    await putDoc({ ...doc, pageIds: restored! });
-
-    await vi.advanceTimersByTimeAsync(10000);
-    expect(await getPage("b")).toBeUndefined();
-    expect(await getPage("c")).toBeDefined();
-    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "c"]);
-    pd.dispose();
-  });
-
-  it("undo after reordering inserts at the intended index without reverting the reorder", async () => {
-    const doc = await seedDoc(["a", "b", "c"]);
-    fakeTimers();
-    const pd = new PendingDeletes(6000);
-    let order = pd.softDelete(doc.pageIds, "b"); // ["a", "c"]
-    order = movePage(order, 0, 1); // user reorders: ["c", "a"]
-    await putDoc({ ...doc, pageIds: order });
-
-    const restored = pd.undo(order, "b");
-    expect(restored).toEqual(["c", "b", "a"]);
-
-    await vi.advanceTimersByTimeAsync(10000);
-    expect(await getPage("b")).toBeDefined();
-    pd.dispose();
-  });
-
-  it("duplicate timeouts and repeated finalize calls delete at most once", async () => {
+  it("finalizes once after a committed removal", async () => {
     const doc = await seedDoc(["a", "b"]);
     fakeTimers();
-    const pd = new PendingDeletes(6000);
-    pd.softDelete(doc.pageIds, "b");
-    // A second softDelete for the same id must not schedule another timer.
-    expect(pd.softDelete(doc.pageIds, "b")).toEqual(doc.pageIds);
-
+    const manager = new PendingDeletes();
+    await manager.remove(doc.id, "b");
+    expect(await manager.remove(doc.id, "b")).toBeNull();
     await vi.advanceTimersByTimeAsync(6000);
     expect(await getPage("b")).toBeUndefined();
-    expect(await pd.finalize("b")).toBe(false);
-    await vi.advanceTimersByTimeAsync(6000);
-    expect(await getPage("b")).toBeUndefined();
-    pd.dispose();
+    expect(await manager.finalize("b")).toBe(false);
+    expect(await manager.restore("b")).toBeNull();
+    await manager.dispose();
   });
-
-  it("dispose finalizes pending deletes without corrupting the stored order", async () => {
+  it("restores into the current order after another page moves", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
     fakeTimers();
-    const pd = new PendingDeletes(6000);
-    const next = pd.softDelete(doc.pageIds, "b");
-    await putDoc({ ...doc, pageIds: next });
-
-    pd.dispose(); // navigate away before the toast ends
+    const manager = new PendingDeletes();
+    const next = (await manager.remove(doc.id, "b"))!;
+    await putDoc({ ...next, pageIds: movePage(next.pageIds, 0, 1) });
+    expect((await manager.restore("b"))!.pageIds).toEqual(["c", "b", "a"]);
+    await manager.dispose();
+  });
+  it("restores only the requested page with multiple pending removals", async () => {
+    const doc = await seedDoc(["a", "b", "c"]);
+    fakeTimers();
+    const manager = new PendingDeletes();
+    await manager.remove(doc.id, "b");
+    await manager.remove(doc.id, "c");
+    await manager.restore("c");
+    await vi.advanceTimersByTimeAsync(6000);
     expect(await getPage("b")).toBeUndefined();
-    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "c"]);
-
-    // Timers were cancelled: advancing time must not delete anything else.
-    await vi.advanceTimersByTimeAsync(60000);
-    expect(await getPage("a")).toBeDefined();
     expect(await getPage("c")).toBeDefined();
+    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "c"]);
+    await manager.dispose();
   });
-
-  it("a finalized deletion stays deleted after reopening the document", async () => {
+  it("finalizes on navigation without removing retained records", async () => {
     const doc = await seedDoc(["a", "b", "c"]);
     fakeTimers();
-    const pd = new PendingDeletes(6000);
-    const next = pd.softDelete(doc.pageIds, "a");
-    await putDoc({ ...doc, pageIds: next });
-    await vi.advanceTimersByTimeAsync(6000);
-    pd.dispose();
-
-    const reopened = (await getDoc(doc.id))!;
-    expect((await getPages(reopened)).map((p) => p.id)).toEqual(["b", "c"]);
-  });
-
-  it("keeps pageIds and page records consistent, with no orphans or missing references", async () => {
-    const doc = await seedDoc(["a", "b", "c", "d"]);
-    fakeTimers();
-    const pd = new PendingDeletes(6000);
-    let order = pd.softDelete(doc.pageIds, "b");
-    order = pd.softDelete(order, "d");
-    const undone = pd.undo(order, "b")!;
-    await putDoc({ ...doc, pageIds: undone });
+    const manager = new PendingDeletes();
+    await manager.remove(doc.id, "b");
+    await manager.dispose();
+    await manager.dispose();
     await vi.advanceTimersByTimeAsync(10000);
-    pd.dispose();
-
-    const finalDoc = (await getDoc(doc.id))!;
-    const pages = await getPages(finalDoc);
-    // Every listed id resolves to a record, and no extra records linger.
-    expect(pages.map((p) => p.id)).toEqual(finalDoc.pageIds);
-    expect(finalDoc.pageIds).toEqual(["a", "b", "c"]);
-    expect(await getPage("d")).toBeUndefined();
-    expect(new Set(finalDoc.pageIds).size).toBe(finalDoc.pageIds.length);
+    const reopened = (await getDoc(doc.id))!;
+    expect((await getPages(reopened)).map((p) => p.id)).toEqual(["a", "c"]);
+  });
+  it("never starts a timer if the document write aborts after request success", async () => {
+    const doc = await seedDoc(["a", "b"]);
+    fakeTimers();
+    const manager = new PendingDeletes();
+    const real = IDBObjectStore.prototype.put;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+      this: IDBObjectStore,
+      ...args: Parameters<IDBObjectStore["put"]>
+    ) {
+      const req = real.apply(this, args);
+      if (this.name === "docs")
+        req.addEventListener("success", () => this.transaction.abort(), { once: true });
+      return req;
+    });
+    await expect(manager.remove(doc.id, "b")).rejects.toBeDefined();
+    spy.mockRestore();
+    expect(manager.size).toBe(0);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(await getPage("b")).toBeDefined();
+    expect((await getDoc(doc.id))!.pageIds).toEqual(["a", "b"]);
+    await manager.dispose();
   });
 });
 

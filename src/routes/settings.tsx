@@ -8,6 +8,7 @@ import { listDocs, type DocRecord } from "@/lib/db";
 import { useI18n } from "@/lib/i18n";
 import { downloadBlob } from "@/lib/pdf";
 import { Button } from "@/components/ui/button";
+import { DocumentBackup } from "@/components/DocumentBackup";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -113,6 +114,7 @@ function SettingsPage() {
           </Button>
         </section>
 
+        <DocumentBackup onRestored={async () => setDocs(await listDocs())} />
         <section className="flex flex-wrap items-center justify-between gap-3 border-b py-5">
           <div className="flex items-center gap-3">
             <Database className="size-5 text-primary" />

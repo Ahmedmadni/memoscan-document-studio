@@ -1,3 +1,5 @@
+import { renderWatermarkPng } from "./watermark";
+import { sha256 as computePdfSha256 } from "./sha256";
 import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { removeSignatureBackground } from "./imaging";
 
@@ -28,31 +30,7 @@ export type PinnedOverlay = {
 export const INITIAL_PLACEMENT: Placement = { x: 0.62, y: 0.72, width: 0.23 };
 const VAULT_KEY = "waraqah.signatures.v1";
 
-/** Compute SHA-256 hex digest of original PDF bytes using Web Crypto API (with pure JS fallback). */
-export async function computePdfSha256(bytes: Uint8Array): Promise<string> {
-  try {
-    if (typeof crypto !== "undefined" && crypto.subtle?.digest) {
-      const copy = new Uint8Array(bytes.byteLength);
-      copy.set(bytes);
-      const buf = await crypto.subtle.digest("SHA-256", copy.buffer);
-      return Array.from(new Uint8Array(buf))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-    }
-  } catch {
-    // fallback below
-  }
-  let h1 = 0xdeadbeef ^ bytes.length;
-  let h2 = 0x41c6ce57 ^ bytes.length;
-  for (let i = 0; i < bytes.length; i++) {
-    const ch = bytes[i]!;
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
-}
+export { sha256 as computePdfSha256 } from "./sha256";
 
 export function displaySize(page: PageGeometry) {
   return page.rotation % 180 === 0
@@ -239,26 +217,6 @@ export async function createSignedPdf(
   }
 
   return pdf.save();
-}
-
-function renderWatermarkPng(text: string): string | null {
-  try {
-    const c = document.createElement("canvas");
-    c.width = 720;
-    c.height = 360;
-    const ctx = c.getContext("2d");
-    if (!ctx) return null;
-    ctx.translate(c.width / 2, c.height / 2);
-    ctx.rotate((-28 * Math.PI) / 180);
-    ctx.font = "700 38px system-ui, sans-serif";
-    ctx.fillStyle = "#475569";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text.slice(0, 48), 0, 0);
-    return c.toDataURL("image/png");
-  } catch {
-    return null;
-  }
 }
 
 export async function readSignatureImage(

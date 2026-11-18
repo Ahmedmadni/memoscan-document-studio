@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { loadImageCanvas } from "@/lib/imaging";
-import { decodeZatcaTlvBase64, type ZatcaInvoiceData } from "@/lib/zatca";
+import { decodeZatcaTlvBase64, checkInvoiceConsistency, type ZatcaInvoiceData } from "@/lib/zatca";
 
 const FIELDS: [keyof ZatcaInvoiceData, TKey][] = [
   ["sellerName", "invoiceSeller"],
@@ -31,6 +31,7 @@ export function InvoiceQrReader({
   const [saved, setSaved] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const issues = invoice ? checkInvoiceConsistency(invoice) : [];
 
   function inspect(payload: string) {
     const decoded = decodeZatcaTlvBase64(payload);
@@ -197,9 +198,21 @@ export function InvoiceQrReader({
       )}
       {invoice && (
         <div className="space-y-3 rounded-lg border bg-background p-4">
-          <p role="status" className="font-medium text-success">
+          <p role="status" className="font-medium">
             {t("zatcaSuccess")}
           </p>
+          {issues.length ? (
+            <ul
+              role="alert"
+              className="space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+            >
+              {issues.map((issue) => (
+                <li key={issue}>{t(issue)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-success">{t("invoiceConsistencyPassed")}</p>
+          )}
           <dl className="space-y-2 text-sm">
             {FIELDS.map(([key, label]) => (
               <div key={key} className="grid gap-1 border-b pb-2 sm:grid-cols-2">

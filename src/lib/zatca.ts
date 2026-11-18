@@ -82,6 +82,9 @@ export function decodeZatcaTlvBase64(base64Str: string): ZatcaInvoiceData | null
       !amount.test(tags[5] ?? "")
     )
       return null;
+    // Date.parse normalizes impossible days such as February 30.
+    const date = tags[3].slice(0, 10);
+    if (new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) return null;
     return {
       sellerName: tags[1] ?? "",
       vatNumber: tags[2] ?? "",
@@ -92,6 +95,24 @@ export function decodeZatcaTlvBase64(base64Str: string): ZatcaInvoiceData | null
   } catch {
     return null;
   }
+}
+
+export type InvoiceIssue = "invoiceVatExceedsTotal" | "invoiceSignsMismatch";
+/** Exact decimal checks; QR fields alone do not identify invoice/note type or prove authenticity. */
+export function checkInvoiceConsistency(data: ZatcaInvoiceData): InvoiceIssue[] {
+  const cents = (value: string) => {
+    const negative = value.startsWith("-");
+    const [whole, fraction = ""] = value.replace(/^-/, "").split(".");
+    const amount = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+    return negative ? -amount : amount;
+  };
+  const total = cents(data.totalWithVat),
+    vat = cents(data.vatAmount);
+  const abs = (value: bigint) => (value < 0n ? -value : value);
+  const issues: InvoiceIssue[] = [];
+  if (abs(vat) > abs(total)) issues.push("invoiceVatExceedsTotal");
+  if (total !== 0n && vat !== 0n && total < 0n !== vat < 0n) issues.push("invoiceSignsMismatch");
+  return issues;
 }
 
 /** Format decoded ZATCA invoice data into searchable Arabic/English accounting notes. */

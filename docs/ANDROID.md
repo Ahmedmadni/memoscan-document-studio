@@ -8,4 +8,7 @@ Native capabilities that will need plugins later:
 - PDF exports use `@capacitor/filesystem` application cache and `@capacitor/share`; save a permanent copy via the share sheet.
 - Faster / more robust edge detection: optional OpenCV native or WASM module.
 - Storage persistence: IndexedDB in the WebView works but can be cleared with app data.
+- Capture sessions now persist locally, including edits and approvals. Test closing/reopening the app before import and interrupting a partial import; the resumed session must reuse its target document without duplicating committed captures.
+- Complete `.waraqah` backups are available in Settings. Restore verifies every image checksum before adding independent document copies. Test export/share, file selection, damaged-file rejection and restore after reinstall. The signature vault and unimported capture drafts are excluded explicitly.
+- IndexedDB v2 upgrades existing v1 data without changing the app ID. Automated migration coverage is included; verify an actual APK update preserves installed documents before distribution.
 - Camera batches use a counted review icon rather than a live thumbnail strip. Review opens page editing before approval; white-paper, clear-text and optional mild curved-edge correction all use the same browser pixel pipeline on Android. Test these controls on a physical device; severe folds/hidden text are not reconstructed.

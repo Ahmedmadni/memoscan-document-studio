@@ -80,7 +80,9 @@ describe("local paper cleanup", () => {
     expect(img.data[ink + 2]).toBeGreaterThan(img.data[ink]);
   });
   it("removes light paper background from photographed signature while keeping dark ink", () => {
-    const img = image(20, 20, (x, y) => (x === 10 && y === 10 ? [20, 30, 80, 255] : [240, 240, 240, 255]));
+    const img = image(20, 20, (x, y) =>
+      x === 10 && y === 10 ? [20, 30, 80, 255] : [240, 240, 240, 255],
+    );
     removeSignatureBackground(img, 210);
     expect(img.data[3]).toBe(0);
     expect(img.data[(10 * 20 + 10) * 4 + 3]).toBe(255);

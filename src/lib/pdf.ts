@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { PageRecord } from "./db";
 import { composeIdCardSheet, loadImageCanvas } from "./imaging";
 import { isNative } from "./native";
+import { renderWatermarkPng } from "./watermark";
 
 export type PdfQuality = "high" | "medium" | "small";
 export type PdfPageSize = "fit" | "a4";
@@ -91,7 +92,12 @@ export async function exportPdf(
       ih = c.height * s;
     }
     pdf.addImage(data, "JPEG", (pw - iw) / 2, (ph - ih) / 2, iw, ih, undefined, "FAST");
-    if (opts.watermarkText?.trim() && /^[\x20-\x7E]+$/.test(opts.watermarkText.trim())) {
+    if (opts.watermarkText?.trim() && !/^[\x20-\x7E]+$/.test(opts.watermarkText.trim())) {
+      const watermark = renderWatermarkPng(opts.watermarkText.trim(), 0.22);
+      if (!watermark) throw new Error("WATERMARK_RENDER_FAILED");
+      const w = pw * 0.8;
+      pdf.addImage(watermark, "PNG", (pw - w) / 2, (ph - w / 2) / 2, w, w / 2);
+    } else if (opts.watermarkText?.trim()) {
       pdf.setFontSize(18);
       pdf.setTextColor(180, 185, 195);
       pdf.text(opts.watermarkText.trim().slice(0, 40), pw / 2, ph / 2, {

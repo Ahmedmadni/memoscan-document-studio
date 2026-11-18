@@ -2,6 +2,8 @@
 
 Waraqah is a privacy-first document workspace for scanning paper documents, decoding Saudi ZATCA tax invoices, and signing/stamping PDF files, designed for Arabic-first mobile use with an English interface and Android packaging through Capacitor.
 
+Camera drafts persist across reopening with per-page edits/approvals and safe import retry. Complete `.waraqah` backups include document images and support validated, atomic restore as new copies. See [Local recovery and backup](docs/DATA_RECOVERY.md).
+
 **Tagline:** From paper to a polished file — in seconds.  
 **الشعار:** من الورق إلى ملف جاهز — في ثوانٍ.
 
@@ -24,7 +26,7 @@ Waraqah is a privacy-first document workspace for scanning paper documents, deco
    - **Official Electronic Stamps (`أختام رسمية`)**: generate dual-language stamps (`APPROVED / معتمد`, `CERTIFIED COPY / نسخة طبق الأصل`, `CONFIDENTIAL / سري للغاية`, `REVIEWED / تمت المراجعة`) + Date Stamps.
    - **Multi-Overlay Pinning & Opacity**: pin multiple stamps and signatures onto the same PDF page with adjustable ink opacity (`30%..100%`) and local **Signature Vault** persistence.
 5. **Saudi ZATCA Tax Invoice QR Decoder & Document Library**:
-   - Built-in TLV Base64 decoder & formatter (`src/lib/zatca.ts`) for Saudi e-Invoicing (ZATCA / الفوترة الإلكترونية) extracting Seller Name, 15-digit VAT Number, Timestamp, Total with VAT, and 15% VAT Amount into searchable document notes.
+   - Built-in TLV Base64 decoder & formatter (`src/lib/zatca.ts`) extracts Seller Name, 15-digit VAT Number, Timestamp, Total with VAT and VAT Amount into searchable notes. It checks calendar dates and warns about inconsistent amounts; decoding QR fields does not verify invoice authenticity or assume a fixed tax rate.
    - Smart categories (`عقود`, `فواتير`, `هويات`, `موقّعة`), multi-document merging (`دمج المستندات`), Dark Mode (`الوضع الداكن`), and JSON metadata backup export.
 
 ## Syncing to GitHub & Building Android APK

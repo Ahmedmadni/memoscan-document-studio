@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import "fake-indexeddb/auto";
+import { Blob as NodeBlob, File as NodeFile } from "node:buffer";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { deleteCaptureDraft } from "@/lib/db";
 import { ImagePickers } from "@/components/ImagePickers";
 import { I18nProvider } from "@/lib/i18n";
 
@@ -11,6 +14,11 @@ vi.mock("@/lib/imaging", async (importOriginal) => {
     processPage: vi.fn(() => document.createElement("canvas")),
   };
 });
+beforeEach(async () => {
+  vi.stubGlobal("Blob", NodeBlob);
+  vi.stubGlobal("File", NodeFile);
+  await deleteCaptureDraft("scan");
+});
 
 afterEach(() => {
   cleanup();
@@ -18,9 +26,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function openCamera() {
+async function openCamera(onFiles = vi.fn()) {
   const stop = vi.fn();
-  const onFiles = vi.fn();
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
     value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) },
@@ -39,6 +46,9 @@ async function openCamera() {
       <ImagePickers onFiles={onFiles} />
     </I18nProvider>,
   );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "التقاط بالكاميرا" })).toBeEnabled(),
+  );
   fireEvent.click(screen.getByRole("button", { name: "التقاط بالكاميرا" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "التقاط صفحة" })).toBeEnabled());
   const video = document.querySelector("video");
@@ -49,6 +59,57 @@ async function openCamera() {
 }
 
 describe("camera review lifecycle", () => {
+  it("restores the capture and its approval after the workspace remounts", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
+      callback(new Blob(["image"], { type: "image/jpeg" })),
+    );
+    await openCamera();
+    fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "اعتماد الصفحة" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("الجلسة محفوظة؛ يمكنك إغلاق الكاميرا واستكمالها لاحقا"),
+      ).toBeInTheDocument(),
+    );
+    cleanup();
+    await openCamera();
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "تم اعتماد الصفحة" })).toBeDisabled(),
+    );
+    expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" })).toBeEnabled();
+  });
+  it("retains a rejected import in the draft for retry", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
+      callback(new Blob(["image"], { type: "image/jpeg" })),
+    );
+    const onFiles = vi.fn(async (files: File[]) => files);
+    await openCamera(onFiles);
+    fireEvent.click(screen.getByRole("button", { name: "التقاط صفحة" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "مراجعة الصفحات" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "مراجعة الصفحات" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "اعتماد الصفحة" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "اعتماد الصفحة" }));
+    fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("بعض الصفحات لم تضف. بقيت في المسودة لتعيد المحاولة."),
+      ).toBeInTheDocument(),
+    );
+    expect(onFiles).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" })).toBeEnabled();
+  });
   it("captures two pages without review interruption and imports only after both approvals", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
       callback(new Blob(["image"], { type: "image/jpeg" })),
@@ -80,9 +141,9 @@ describe("camera review lifecycle", () => {
       expect(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (2/2)" }));
-    expect(onFiles).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
     expect(onFiles.mock.calls[0][0]).toHaveLength(2);
-    expect(stop).toHaveBeenCalled();
+    await waitFor(() => expect(stop).toHaveBeenCalled());
   });
   it("keeps the same live video when accepting a multi-shot review", async () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) =>
@@ -159,7 +220,7 @@ describe("camera review lifecycle", () => {
       1000,
     );
     fireEvent.click(screen.getByRole("button", { name: "إضافة الصفحات المعتمدة (1/1)" }));
-    expect(onFiles).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onFiles).toHaveBeenCalledOnce());
     const [[files, edits]] = onFiles.mock.calls;
     expect(files).toHaveLength(1);
     expect(edits.get(files[0])).toMatchObject({ filter: "paper", curvedEdges: true });

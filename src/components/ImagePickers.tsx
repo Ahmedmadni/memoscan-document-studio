@@ -25,6 +25,18 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageEditor } from "@/components/PageEditor";
 import { useI18n } from "@/lib/i18n";
+import { useCaptureDraft } from "@/lib/use-capture-draft";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import {
   batchApproved,
   cameraControls,
@@ -39,10 +51,16 @@ export function ImagePickers({
   onFiles,
   disabled,
   size = "lg",
+  draftKey = "scan",
 }: {
-  onFiles: (files: File[], edits?: ReadonlyMap<File, EditSettings>) => void;
+  onFiles: (
+    files: File[],
+    edits?: ReadonlyMap<File, EditSettings>,
+    sourceDraft?: string,
+  ) => void | Promise<File[] | void>;
   disabled?: boolean;
   size?: "default" | "lg";
+  draftKey?: string;
 }) {
   const { t } = useI18n();
   const system = useRef<HTMLInputElement>(null);
@@ -56,7 +74,9 @@ export function ImagePickers({
   const [showGrid, setShowGrid] = useState(true);
   const [controlBusy, setControlBusy] = useState(false);
   const [controlError, setControlError] = useState("");
-  const [approved, setApproved] = useState<Set<File>>(new Set());
+  const draft = useCaptureDraft(draftKey);
+  const { captured, setCaptured, approved, setApproved, reviewSettings, setReviewSettings } = draft;
+  const [importing, setImporting] = useState(false);
   const lib = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const selectedReviewButton = useRef<HTMLButtonElement>(null);
@@ -66,12 +86,10 @@ export function ImagePickers({
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [captured, setCaptured] = useState<File[]>([]);
   const [captureMode, setCaptureMode] = useState<"single" | "multi">("multi");
   const [liveCorners, setLiveCorners] = useState<Corners | null>(null);
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [editingReview, setEditingReview] = useState(false);
-  const [reviewSettings, setReviewSettings] = useState<Map<File, EditSettings>>(new Map());
   const [reviewPreview, setReviewPreview] = useState<{
     file: File;
     settings: EditSettings;
@@ -214,25 +232,23 @@ export function ImagePickers({
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (files.length) onFiles(files);
+    if (files.length)
+      void Promise.resolve(onFiles(files)).catch(() => setCameraError(t("captureFailed")));
   };
 
   const closeCamera = () => {
     captureRevision.current += 1;
     setCapturing(false);
     setCameraOpen(false);
-    setCaptured([]);
-    setApproved(new Set());
     setControlError("");
     setCameraError("");
     setReviewFile(null);
     setEditingReview(false);
-    setReviewSettings(new Map());
     setReviewPreview(null);
   };
 
   const capture = () => {
-    if (capturing || reviewFile || !cameraReady) return;
+    if (importing || capturing || reviewFile || !cameraReady) return;
     const element = video.current;
     if (!element || !element.videoWidth || !element.videoHeight) return;
     const revision = ++captureRevision.current;
@@ -297,16 +313,23 @@ export function ImagePickers({
     if (next) beginReview(next);
   };
 
-  const acceptCaptured = () => {
-    if (!batchApproved(captured, approved)) return;
+  const acceptCaptured = async () => {
+    if (importing || !batchApproved(captured, approved)) return;
     const files = [...captured];
-    setCameraOpen(false);
-    setCaptured([]);
-    setApproved(new Set());
-    setReviewFile(null);
-    setReviewSettings(new Map());
-    setReviewPreview(null);
-    onFiles(files, reviewSettings);
+    setImporting(true);
+    try {
+      await draft.flush();
+      const remaining = (await onFiles(files, reviewSettings, draftKey)) ?? [];
+      await draft.replace(remaining);
+      setReviewFile(remaining[0] ?? null);
+      setReviewPreview(null);
+      setCameraError(remaining.length ? t("captureImportRemaining") : "");
+      if (!remaining.length) setCameraOpen(false);
+    } catch {
+      setCameraError(t("draftSaveFailed"));
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -315,7 +338,7 @@ export function ImagePickers({
         <Button
           size={size}
           className="min-h-14 gap-3 px-7 shadow-paper"
-          disabled={disabled}
+          disabled={disabled || !draft.ready}
           onClick={() => setCameraOpen(true)}
         >
           <Camera /> {t("scanCamera")}
@@ -339,6 +362,63 @@ export function ImagePickers({
         <input ref={lib} type="file" accept="image/*" multiple hidden onChange={handleImport} />
       </div>
 
+      {!cameraOpen && captured.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm">
+          <span>
+            {t("captureDraft")} · {captured.length} {t("pages")}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={disabled || !draft.ready}
+              onClick={() => {
+                setCameraOpen(true);
+                beginReview(captured.find((file) => !approved.has(file)) ?? captured[0]);
+              }}
+            >
+              {t("resumeDraft")}
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="ghost">
+                  {t("discardDraft")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("discardDraft")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("discardDraftHint")}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      void draft.replace([]).catch(() => setCameraError(t("draftSaveFailed")));
+                    }}
+                  >
+                    {t("delete")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+      {draft.error && !cameraOpen && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {t("draftSaveFailed")}{" "}
+          <button
+            className="underline"
+            onClick={() => {
+              void draft.retry().catch(() => {});
+            }}
+          >
+            {t("retry")}
+          </button>
+        </p>
+      )}
+
       {cameraOpen && (
         <div
           className="camera-workspace fixed inset-0 z-[70] flex flex-col overflow-hidden bg-stage text-stage-foreground"
@@ -358,6 +438,7 @@ export function ImagePickers({
               size="icon"
               className="text-stage-foreground hover:bg-stage-foreground/15 hover:text-stage-foreground"
               onClick={closeCamera}
+              disabled={importing}
               aria-label={t("cancel")}
             >
               <X />
@@ -458,7 +539,7 @@ export function ImagePickers({
                 </svg>
               )}
             </div>
-            {(cameraError || controlError) && (
+            {!reviewFile && (cameraError || controlError) && (
               <div
                 className="absolute inset-x-5 top-5 rounded-lg bg-destructive p-4 text-sm text-destructive-foreground"
                 role="alert"
@@ -534,6 +615,7 @@ export function ImagePickers({
                   aria-label={t("edit")}
                   title={t("edit")}
                   onClick={() => setEditingReview(true)}
+                  disabled={importing}
                 >
                   <SlidersHorizontal />
                   {t("edit")}
@@ -544,6 +626,7 @@ export function ImagePickers({
                   size="icon"
                   aria-label={t("removeCaptured")}
                   title={t("removeCaptured")}
+                  disabled={importing}
                   onClick={() => {
                     const index = captured.indexOf(reviewFile);
                     const remaining = captured.filter((file) => file !== reviewFile);
@@ -566,7 +649,7 @@ export function ImagePickers({
                   <Trash2 />
                 </Button>
                 <Button
-                  disabled={approved.has(reviewFile) || !selectedPreview}
+                  disabled={importing || approved.has(reviewFile) || !selectedPreview}
                   onClick={acceptReview}
                   className="work-confirm h-auto min-h-11 whitespace-normal px-2"
                 >
@@ -577,11 +660,31 @@ export function ImagePickers({
             </>
           )}
           <footer className="shrink-0 border-t border-stage-foreground/15 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {captured.length > 0 && (
+              <p
+                role={draft.error ? "alert" : "status"}
+                className="mb-2 text-center text-xs text-stage-foreground/75"
+              >
+                {t(draft.error ? "draftSaveFailed" : draft.saving ? "draftSaving" : "draftSaved")}
+                {draft.error && (
+                  <button
+                    className="ms-2 underline"
+                    disabled={importing}
+                    onClick={() => {
+                      void draft.retry().catch(() => {});
+                    }}
+                  >
+                    {t("retry")}
+                  </button>
+                )}
+              </p>
+            )}
             {reviewFile ? (
               <div className="grid grid-cols-[1fr_1.25fr] gap-2">
                 <Button
                   variant="ghost"
                   className="camera-tool h-auto min-h-11 whitespace-normal border border-stage-foreground/15 px-2"
+                  disabled={importing}
                   onClick={() => {
                     setReviewFile(null);
                     setCameraError("");
@@ -592,8 +695,8 @@ export function ImagePickers({
                 </Button>
                 <Button
                   className="work-confirm h-auto min-h-11 whitespace-normal px-2"
-                  disabled={!batchApproved(captured, approved)}
-                  onClick={acceptCaptured}
+                  disabled={importing || !batchApproved(captured, approved)}
+                  onClick={() => void acceptCaptured()}
                 >
                   <Check />
                   {t("finishBatch")} ({approved.size}/{captured.length})

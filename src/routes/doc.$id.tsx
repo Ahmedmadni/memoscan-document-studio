@@ -51,19 +51,14 @@ import {
   getDoc,
   getPages,
   putDoc,
-  putPage,
+  savePageEdits,
+  appendPage,
   uid,
   type DocCategory,
   type DocRecord,
   type PageRecord,
 } from "@/lib/db";
-import {
-  addFilesToDoc,
-  applyFilterToAllPages,
-  insertAfter,
-  movePage,
-  reorderPages,
-} from "@/lib/docOps";
+import { addFilesToDoc, applyFilterToAllPages, movePage, reorderPages } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import { useI18n, type TKey } from "@/lib/i18n";
 import type { FilterMode } from "@/lib/imaging";
@@ -130,11 +125,17 @@ function DocPage() {
   const [pdf, setPdf] = useState<Blob | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
+  const actionBusy = useRef(false);
   const exportSectionRef = useRef<HTMLElement>(null);
   // Soft deletes awaiting undo or finalization; finalized on unmount.
   const pendingDeletes = useRef<PendingDeletes | null>(null);
-  pendingDeletes.current ??= new PendingDeletes(6000);
-  useEffect(() => () => pendingDeletes.current?.dispose(), []);
+  pendingDeletes.current ??= new PendingDeletes(6000, (error) => toast.error(t(errorKey(error))));
+  useEffect(
+    () => () => {
+      void pendingDeletes.current?.dispose().catch(() => {});
+    },
+    [],
+  );
   // A small movement threshold keeps taps (open editor) from starting a drag.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -166,13 +167,17 @@ function DocPage() {
     setDoc(next);
     setPages(await getPages(next));
   }
-  const run = async (label: string, fn: () => Promise<void>) => {
-    setBusy(label);
+  const run = async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
+    setBusy(label || t("processing"));
     try {
-      await fn();
+      return await fn();
     } catch (e) {
       toast.error(t(errorKey(e)));
+      return undefined;
     } finally {
+      actionBusy.current = false;
       setBusy(null);
     }
   };
@@ -210,20 +215,22 @@ function DocPage() {
     const manager = pendingDeletes.current;
     if (!manager) return;
     void run("", async () => {
-      const next = manager.softDelete(ids, p.id);
-      if (next === ids) return;
-      await saveOrder(next);
-      const finalize = () => void manager.finalize(p.id);
+      const next = await manager.remove(doc.id, p.id);
+      if (!next) return;
+      setDoc(next);
+      setPages(await getPages(next));
+      const finalize = () => void manager.finalize(p.id).catch((e) => toast.error(t(errorKey(e))));
       toast(t("pageDeleted"), {
         duration: 6000,
         action: {
           label: t("undo"),
           onClick: () => {
             void run("", async () => {
-              const fresh = await getDoc(doc.id);
-              if (!fresh) return;
-              const restored = manager.undo(fresh.pageIds, p.id);
-              if (restored) await saveOrder(restored, fresh);
+              const restored = await manager.restore(p.id);
+              if (restored) {
+                setDoc(restored);
+                setPages(await getPages(restored));
+              }
             });
           },
         },
@@ -334,19 +341,23 @@ function DocPage() {
         </div>
 
         <ImagePickers
+          key={doc.id}
+          draftKey={`doc:${doc.id}`}
           size="default"
           disabled={!!busy}
-          onFiles={(files, edits) =>
-            run(t("processing"), async () => {
+          onFiles={async (files, edits, sourceDraft) =>
+            (await run(t("processing"), async () => {
               const r = await addFilesToDoc(
                 doc.id,
                 files,
                 (a, b) => setBusy(`${t("processing")} ${a}/${b}`),
                 edits,
+                sourceDraft,
               );
               if (r.failed) toast.error(t(errorKey(r.firstError)));
               await load();
-            })
+              return r.failedFiles;
+            })) ?? files
           }
         />
         {busy && (
@@ -399,6 +410,7 @@ function DocPage() {
                   {pages.map((p, i) => (
                     <SortablePageCard
                       key={p.id}
+                      disabled={!!busy}
                       page={p}
                       index={i}
                       total={pages.length}
@@ -406,9 +418,14 @@ function DocPage() {
                       onMove={(d) => move(i, d)}
                       onDuplicate={() =>
                         run("", async () => {
-                          const copy = { ...p, id: uid(), createdAt: Date.now() };
-                          await putPage(copy);
-                          await saveOrder(insertAfter(ids, i, copy.id));
+                          const copy = {
+                            ...p,
+                            id: uid(),
+                            createdAt: Date.now(),
+                            captureKey: undefined,
+                          };
+                          await appendPage(copy, p.id);
+                          await load();
                         })
                       }
                       onReplace={() => {
@@ -434,64 +451,71 @@ function DocPage() {
             const pid = replaceTarget.current;
             if (f && pid)
               void run(t("processing"), async () => {
-                await putPage(await buildPage(doc.id, f, pid));
+                await savePageEdits(doc.id, [await buildPage(doc.id, f, pid)]);
                 await load();
               });
           }}
         />
 
         {pages.length > 0 && (
-          <section className="space-y-4 border-t pt-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">{t("ocrNotesTitle")}</h2>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const summary = pages
-                      .map(
-                        (p, idx) =>
-                          `[${t("page")} ${idx + 1}: ${p.width}×${p.height}px · ${p.settings.filter}]`,
-                      )
-                      .join("\n");
-                    const nextNotes = notes ? `${notes}\n${summary}` : summary;
-                    setNotes(nextNotes);
-                    void run("", () => saveOrder(ids, { ...doc, notes: nextNotes }));
-                  }}
-                >
-                  {t("autoAnalyzePage")}
-                </Button>
-                {notes && (
+          <section className="space-y-3 border-t pt-5">
+            <details className="rounded-lg border bg-card p-3">
+              <summary className="cursor-pointer text-sm font-semibold">
+                {t("ocrNotesTitle")}
+              </summary>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(notes);
-                      toast.success(t("copiedText"));
+                      const summary = pages
+                        .map(
+                          (p, idx) =>
+                            `[${t("page")} ${idx + 1}: ${p.width}×${p.height}px · ${p.settings.filter}]`,
+                        )
+                        .join("\n");
+                      const nextNotes = notes ? `${notes}\n${summary}` : summary;
+                      setNotes(nextNotes);
+                      void run("", () => saveOrder(ids, { ...doc, notes: nextNotes }));
                     }}
                   >
-                    <Copy className="me-1 size-3.5" />
-                    {t("copyText")}
+                    {t("autoAnalyzePage")}
                   </Button>
-                )}
+                  {notes && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(notes);
+                        toast.success(t("copiedText"));
+                      }}
+                    >
+                      <Copy className="me-1 size-3.5" />
+                      {t("copyText")}
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={() => {
-                if (notes !== (doc.notes ?? "")) {
-                  void run("", () => saveOrder(ids, { ...doc, notes }));
-                }
-              }}
-              placeholder={t("ocrNotesPlaceholder")}
-              rows={3}
-              className="w-full rounded-xl border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
-
-            <h2 className="text-sm font-semibold">{t("zatcaTitle")}</h2>
-            <InvoiceQrReader onSave={saveInvoiceNotes} />
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => {
+                  if (notes !== (doc.notes ?? "")) {
+                    void run("", () => saveOrder(ids, { ...doc, notes }));
+                  }
+                }}
+                placeholder={t("ocrNotesPlaceholder")}
+                rows={3}
+                className="w-full rounded-xl border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+            </details>
+            <details className="rounded-lg border bg-card p-3">
+              <summary className="cursor-pointer text-sm font-semibold">{t("zatcaTitle")}</summary>
+              <div className="pt-3">
+                <InvoiceQrReader onSave={saveInvoiceNotes} />
+              </div>
+            </details>
           </section>
         )}
 
@@ -630,7 +654,7 @@ function DocPage() {
           }}
           onSave={async (settings) => {
             const out = await renderOutputs(editing.original, settings);
-            await putPage({ ...editing, ...out, settings });
+            await savePageEdits(doc.id, [{ ...editing, ...out, settings }]);
             await load();
           }}
         />
@@ -648,6 +672,7 @@ function SortablePageCard({
   onDuplicate,
   onReplace,
   onDelete,
+  disabled = false,
 }: {
   page: PageRecord;
   index: number;
@@ -657,10 +682,12 @@ function SortablePageCard({
   onDuplicate: () => void;
   onReplace: () => void;
   onDelete: () => void;
+  disabled?: boolean;
 }) {
   const { t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: p.id,
+    disabled,
   });
   const numStr = String(i + 1).padStart(2, "0");
   return (
@@ -676,6 +703,7 @@ function SortablePageCard({
           variant="ghost"
           className="relative flex h-72 w-full items-center justify-center rounded-none bg-muted p-4 hover:bg-muted"
           onClick={onEdit}
+          disabled={disabled}
           aria-label={`${t("edit")} ${i + 1}`}
         >
           <img src={p.thumb} alt="" className="max-h-full max-w-full rounded object-contain" />
@@ -688,6 +716,7 @@ function SortablePageCard({
           size="icon"
           {...attributes}
           {...listeners}
+          disabled={disabled}
           aria-label={`${t("dragToReorder")} ${i + 1}`}
           title={t("dragToReorder")}
           className="camera-tool absolute end-2 top-2 grid size-11 cursor-grab touch-none place-items-center rounded-md bg-stage/80 active:cursor-grabbing"
@@ -703,7 +732,7 @@ function SortablePageCard({
         {p.autoDetected ? t("autoBadge") : t("manualBadge")}
       </p>
       <div className="flex items-center justify-between gap-2 p-2.5">
-        <Button variant="secondary" className="min-h-11" onClick={onEdit}>
+        <Button variant="secondary" disabled={disabled} className="min-h-11" onClick={onEdit}>
           <Pencil />
           {t("edit")}
         </Button>
@@ -714,6 +743,7 @@ function SortablePageCard({
               size="icon"
               className="size-11"
               aria-label={`${t("pageActions")} ${i + 1}`}
+              disabled={disabled}
             >
               <MoreHorizontal />
             </Button>

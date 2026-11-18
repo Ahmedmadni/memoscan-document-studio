@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { PageHeading } from "@/components/PageHeading";
 import { ImagePickers } from "@/components/ImagePickers";
-import { createDoc, deleteDoc } from "@/lib/db";
+import { createDoc, deleteDoc, getCaptureDraft, getDoc, linkCaptureDraft } from "@/lib/db";
 import { addFilesToDoc, defaultDocName } from "@/lib/docOps";
 import { errorKey } from "@/lib/errors";
 import type { EditSettings } from "@/lib/imaging";
@@ -34,26 +34,36 @@ function ScanPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null);
-  async function startWith(files: File[], edits?: ReadonlyMap<File, EditSettings>) {
-    if (!files.length || busy) return;
+  async function startWith(
+    files: File[],
+    edits?: ReadonlyMap<File, EditSettings>,
+    sourceDraft?: string,
+  ) {
+    if (!files.length || busy) return files;
     setBusy({ done: 0, total: files.length });
     try {
-      const doc = await createDoc(defaultDocName(t("untitled"), lang));
+      const draft = sourceDraft ? await getCaptureDraft(sourceDraft) : null;
+      const existing = draft?.destinationDocId ? await getDoc(draft.destinationDocId) : undefined;
+      const doc = existing ?? (await createDoc(defaultDocName(t("untitled"), lang)));
+      if (sourceDraft) await linkCaptureDraft(sourceDraft, doc.id);
       const result = await addFilesToDoc(
         doc.id,
         files,
         (done, total) => setBusy({ done, total }),
         edits,
+        sourceDraft,
       );
       if (result.failed) toast.error(t(errorKey(result.firstError)));
       // Failed imports must not leave empty documents in the library.
       if (result.failed === files.length) {
-        await deleteDoc(doc.id);
-        return;
+        if (!(await getDoc(doc.id))?.pageIds.length) await deleteDoc(doc.id);
+        return files;
       }
       await navigate({ to: "/doc/$id", params: { id: doc.id } });
+      return result.failedFiles;
     } catch (error) {
       toast.error(t(errorKey(error)));
+      return files;
     } finally {
       setBusy(null);
     }
@@ -83,10 +93,7 @@ function ScanPage() {
               <ShieldCheck className="size-6 text-primary" aria-hidden="true" />
             </div>
             <div className="scan-source-controls">
-              <ImagePickers
-                onFiles={(files, edits) => void startWith(files, edits)}
-                disabled={!!busy}
-              />
+              <ImagePickers onFiles={startWith} disabled={!!busy} />
             </div>
             {busy && (
               <p role="status" className="flex items-center gap-2 text-sm text-primary">

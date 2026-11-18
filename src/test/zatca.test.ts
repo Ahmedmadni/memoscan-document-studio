@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { decodeZatcaTlvBase64, encodeZatcaTlvBase64, formatZatcaSummary } from "@/lib/zatca";
+import {
+  checkInvoiceConsistency,
+  decodeZatcaTlvBase64,
+  encodeZatcaTlvBase64,
+  formatZatcaSummary,
+} from "@/lib/zatca";
 
 describe("Saudi ZATCA TLV Base64 e-invoice helper", () => {
   it("encodes and decodes Arabic seller name, 15-digit VAT number, timestamp, total, and 15% VAT", () => {
@@ -20,6 +25,46 @@ describe("Saudi ZATCA TLV Base64 e-invoice helper", () => {
   it("returns null for malformed or non-TLV Base64 strings", () => {
     expect(decodeZatcaTlvBase64("")).toBeNull();
     expect(decodeZatcaTlvBase64("not-valid-base64!!!")).toBeNull();
+  });
+});
+
+describe("invoice data checks", () => {
+  const invoice = {
+    sellerName: "مورد",
+    vatNumber: "300123456700003",
+    timestamp: "2026-11-06T12:30:00Z",
+    totalWithVat: "100.00",
+    vatAmount: "15.00",
+  };
+  it.each(["2026-02-30T12:30:00Z", "2026-02-29T12:30:00Z", "2026-04-31T12:30:00+03:00"])(
+    "rejects an impossible calendar date %s",
+    (timestamp) => {
+      expect(decodeZatcaTlvBase64(encodeZatcaTlvBase64({ ...invoice, timestamp }))).toBeNull();
+    },
+  );
+  it("accepts a real leap day with timezone and checks exact decimal amounts", () => {
+    expect(
+      decodeZatcaTlvBase64(
+        encodeZatcaTlvBase64({ ...invoice, timestamp: "2024-02-29T23:59:59+03:00" }),
+      ),
+    ).not.toBeNull();
+    expect(
+      checkInvoiceConsistency({
+        ...invoice,
+        totalWithVat: "9007199254740992.10",
+        vatAmount: "9007199254740992.11",
+      }),
+    ).toEqual(["invoiceVatExceedsTotal"]);
+    expect(checkInvoiceConsistency({ ...invoice, vatAmount: "-15" })).toEqual([
+      "invoiceSignsMismatch",
+    ]);
+  });
+  it("allows consistent negative notes, zero tax and differing tax rates", () => {
+    expect(checkInvoiceConsistency({ ...invoice, totalWithVat: "-100", vatAmount: "-15" })).toEqual(
+      [],
+    );
+    expect(checkInvoiceConsistency({ ...invoice, vatAmount: "0" })).toEqual([]);
+    expect(checkInvoiceConsistency({ ...invoice, vatAmount: "5" })).toEqual([]);
   });
 });
 

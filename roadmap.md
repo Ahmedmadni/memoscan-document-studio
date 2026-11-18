@@ -1,5 +1,18 @@
 # Final Waraqah stabilization
 
+## Data protection and recovery
+
+- [x] Commit related storage writes atomically and start deletion timers only after successful writes; guard finalized deletion against restored references.
+- [x] Persist camera drafts, edits and approvals, keep failed imports for retry, and avoid duplicate captures when resuming an interrupted import.
+- [x] Export full document/image backups, verify checksums before restore and add independent copies atomically.
+- [x] Preserve supported source image bytes independently from bounded processing previews.
+- [x] Correct Arabic watermark export, use real SHA-256 on fallback platforms, reject impossible invoice dates and warn about contradictory monetary values.
+- [x] Use honest notes labels and collapse secondary notes/invoice tools in the document workspace.
+- [x] Pin the previously successful Bun version and check formatting/types without rewriting source during CI.
+- [ ] Add per-stroke signature undo/eraser and adjustable smoothing.
+- [ ] Add on-device OCR and an invoice history/export workflow.
+- [ ] Verify current production camera, storage and sharing flows on a physical Android phone. Local browser automation is currently blocked by Chromium's process socket restriction; automated component/storage regressions are available.
+
 ## Visual identity refinement
 
 - [x] Refine camera, review and editor layouts. Verified capture, editing, approval and PDF export at 320×568 in Arabic and 390×844 in English using a simulated camera stream.

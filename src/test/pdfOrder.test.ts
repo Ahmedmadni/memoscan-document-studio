@@ -8,6 +8,14 @@ import { reorderPages, reinsertAt, removeId } from "@/lib/docOps";
 import { defaultSettings } from "@/lib/imaging";
 import { exportPdf } from "@/lib/pdf";
 import { PAGE_A_JPEG, PAGE_B_JPEG, PAGE_C_JPEG } from "./fixtures";
+import { renderWatermarkPng } from "@/lib/watermark";
+
+vi.mock("@/lib/watermark", () => ({
+  renderWatermarkPng: vi.fn(
+    () =>
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  ),
+}));
 
 const URLS: Record<string, string> = {
   PAGE_A: PAGE_A_JPEG,
@@ -64,6 +72,22 @@ function markerPositions(bytes: Uint8Array) {
 }
 
 describe("exported PDF page order", () => {
+  it("embeds an Arabic watermark as an image instead of dropping it", async () => {
+    const blob = await exportPdf([page("PAGE_A")], {
+      quality: "medium",
+      pageSize: "a4",
+      watermarkText: "سري",
+    });
+    expect(renderWatermarkPng).toHaveBeenCalledWith("سري", 0.22);
+    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(blob);
+    });
+    const text = new TextDecoder("latin1").decode(bytes);
+    expect(text.split("/Subtype /Image").length - 1).toBeGreaterThan(1);
+  });
   it("exports three pages in document order A, B, C", async () => {
     const bytes = await pdfBytes(["PAGE_A", "PAGE_B", "PAGE_C"]);
     const { a, b, c } = markerPositions(bytes);

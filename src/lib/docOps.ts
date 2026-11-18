@@ -1,4 +1,13 @@
-import { createDoc, getDoc, getPages, putDoc, putPage, uid, type DocRecord } from "./db";
+import {
+  getDoc,
+  getPages,
+  appendPage,
+  restoreDocuments,
+  savePageEdits,
+  uid,
+  type DocRecord,
+  type PageRecord,
+} from "./db";
 import type { EditSettings, FilterMode } from "./imaging";
 import { buildPage, renderOutputs } from "./pages";
 
@@ -6,6 +15,7 @@ export interface ImportResult {
   added: number;
   failed: number;
   firstError?: unknown;
+  failedFiles: File[];
 }
 
 /** Processes files one by one (keeps memory bounded) and appends them to the document. */
@@ -14,30 +24,28 @@ export async function addFilesToDoc(
   files: File[],
   onProgress?: (done: number, total: number) => void,
   edits?: ReadonlyMap<File, EditSettings>,
+  sourceDraft?: string,
 ): Promise<ImportResult> {
   let added = 0;
   let failed = 0;
   let firstError: unknown;
-  const newIds: string[] = [];
+  const failedFiles: File[] = [];
   for (let i = 0; i < files.length; i++) {
     try {
       const file = files[i];
       const page = await buildPage(docId, file, undefined, edits?.get(file));
-      await putPage(page);
-      newIds.push(page.id);
+      if (sourceDraft)
+        page.captureKey = JSON.stringify([sourceDraft, file.name, file.lastModified, file.size]);
+      await appendPage(page);
       added++;
     } catch (e) {
       failed++;
       firstError ??= e;
+      failedFiles.push(files[i]);
     }
     onProgress?.(i + 1, files.length);
   }
-  const doc = await getDoc(docId);
-  if (doc && newIds.length) {
-    const next: DocRecord = { ...doc, pageIds: [...doc.pageIds, ...newIds], updatedAt: Date.now() };
-    await putDoc(next);
-  }
-  return { added, failed, firstError };
+  return { added, failed, firstError, failedFiles };
 }
 
 /** Batch-apply a CamScanner filter across every page in a document. */
@@ -49,32 +57,47 @@ export async function applyFilterToAllPages(
   const doc = await getDoc(docId);
   if (!doc) return;
   const pages = await getPages(doc);
+  const updated: PageRecord[] = [];
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i]!;
     const settings = { ...p.settings, filter };
     const out = await renderOutputs(p.original, settings);
-    await putPage({ ...p, ...out, settings });
+    updated.push({ ...p, ...out, settings });
     onProgress?.(i + 1, pages.length);
   }
-  await putDoc({ ...doc, updatedAt: Date.now() });
+  await savePageEdits(docId, updated);
 }
 
 /** Merge multiple documents into a new multi-page document without altering originals. */
 export async function mergeDocuments(docIds: string[], mergedName: string): Promise<DocRecord> {
-  const target = await createDoc(mergedName);
+  const now = Date.now();
+  const target: DocRecord = {
+    id: uid(),
+    name: mergedName,
+    createdAt: now,
+    updatedAt: now,
+    pageIds: [],
+  };
   const newPageIds: string[] = [];
+  const copies: PageRecord[] = [];
   for (const id of docIds) {
     const srcDoc = await getDoc(id);
     if (!srcDoc) continue;
     const pages = await getPages(srcDoc);
     for (const p of pages) {
       const copyId = uid();
-      await putPage({ ...p, id: copyId, docId: target.id, createdAt: Date.now() });
+      copies.push({
+        ...p,
+        id: copyId,
+        docId: target.id,
+        createdAt: Date.now(),
+        captureKey: undefined,
+      });
       newPageIds.push(copyId);
     }
   }
   const updated: DocRecord = { ...target, pageIds: newPageIds, updatedAt: Date.now() };
-  await putDoc(updated);
+  await restoreDocuments([updated], copies);
   return updated;
 }
 

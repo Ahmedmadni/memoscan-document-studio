@@ -3,6 +3,77 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 export type Lang = "ar" | "en";
 
 const dict = {
+  retry: { ar: "إعادة المحاولة", en: "Retry" },
+  storageBusy: {
+    ar: "أغلق نوافذ التطبيق الأخرى ثم أعد المحاولة لإكمال تحديث التخزين.",
+    en: "Close other app windows and retry to finish updating local storage.",
+  },
+  invoiceVatExceedsTotal: {
+    ar: "تنبيه: مبلغ الضريبة أكبر من إجمالي الفاتورة. راجع البيانات الأصلية.",
+    en: "Warning: VAT exceeds the invoice total. Review the source invoice.",
+  },
+  invoiceSignsMismatch: {
+    ar: "تنبيه: إشارة مبلغ الضريبة تختلف عن إشارة الإجمالي. راجع نوع المستند والمبالغ.",
+    en: "Warning: VAT and total have different signs. Review the document type and amounts.",
+  },
+  invoiceConsistencyPassed: {
+    ar: "لم يظهر تعارض بين مبلغ الضريبة والإجمالي في الفحص المحلي. الأصالة لم تتحقق.",
+    en: "Local checks found no VAT/total conflict. Authenticity has not been verified.",
+  },
+  captureDraft: { ar: "جلسة تصوير محفوظة", en: "Saved capture session" },
+  captureImportRemaining: {
+    ar: "بعض الصفحات لم تضف. بقيت في المسودة لتعيد المحاولة.",
+    en: "Some pages were not added. They remain in the draft so you can retry.",
+  },
+  resumeDraft: { ar: "استكمال", en: "Resume" },
+  discardDraft: { ar: "حذف المسودة", en: "Discard draft" },
+  discardDraftHint: {
+    ar: "ستحذف لقطات هذه الجلسة غير المضافة للمستند. المستندات المحفوظة تبقى كما هي.",
+    en: "Remove this session's unimported captures. Saved documents are kept.",
+  },
+  draftSaving: { ar: "جار حفظ الجلسة على جهازك…", en: "Saving session on your device…" },
+  draftSaved: {
+    ar: "الجلسة محفوظة؛ يمكنك إغلاق الكاميرا واستكمالها لاحقا",
+    en: "Session saved. You can close the camera and resume later.",
+  },
+  draftSaveFailed: {
+    ar: "تعذر حفظ مسودة التصوير. أبق التطبيق مفتوحا وأعد المحاولة.",
+    en: "Capture draft could not be saved. Keep the app open and retry.",
+  },
+  fullBackup: { ar: "نسخة كاملة للمستندات", en: "Full document backup" },
+  fullBackupHint: {
+    ar: "يحفظ الصور الأصلية والمعالجة وترتيب الصفحات والتعديلات والملاحظات في ملف على جهازك. مسودات التصوير وخزنة التوقيعات لا تدرجان في هذا الملف.",
+    en: "Save original and processed images, page order, edits and notes to a file on your device. Capture drafts and the signature vault are not included.",
+  },
+  exportFullBackup: { ar: "تصدير نسخة كاملة", en: "Export full backup" },
+  chooseBackup: { ar: "اختيار نسخة للاستعادة", en: "Choose backup to restore" },
+  backupChecked: { ar: "تم فحص سلامة النسخة", en: "Backup integrity checked" },
+  documentsCountLabel: { ar: "مستندات", en: "documents" },
+  restoreAddsCopies: {
+    ar: "تضاف المستندات كنسخ جديدة دون استبدال ملفاتك الحالية.",
+    en: "Documents are added as new copies without replacing existing files.",
+  },
+  restoreBackup: { ar: "إضافة المستندات المحفوظة", en: "Restore document copies" },
+  backupRestored: {
+    ar: "تمت استعادة المستندات والصور والتعديلات",
+    en: "Documents, images and edits restored",
+  },
+  backupInvalid: {
+    ar: "هذا الملف ليس نسخة ورقة مدعومة أو أن محتواه تالف. لم يتغير أي مستند.",
+    en: "This is not a supported Waraqah backup, or its contents are damaged. No document was changed.",
+  },
+  backupTooLarge: {
+    ar: "حجم النسخة يتجاوز الحد المدعوم حاليا وهو 512 ميجابايت.",
+    en: "This backup exceeds the current 512 MB limit.",
+  },
+  backupIncomplete: {
+    ar: "تعذر إنشاء نسخة كاملة. توجد صفحة مفقودة أو بيانات غير مدعومة؛ راجع مستنداتك أولا.",
+    en: "A complete backup could not be created. A page is missing or contains unsupported data; review your documents first.",
+  },
+  storageWriteFailed: {
+    ar: "لم يكتمل الحفظ. تحقق من مساحة التخزين ثم أعد المحاولة.",
+    en: "Saving did not complete. Check available storage and retry.",
+  },
   workspaceLabel: { ar: "مساحة عمل المستندات الذكية", en: "Smart document workspace" },
   homeSubtitle: { ar: "مستنداتك، بكل وضوح.", en: "Your documents, in order." },
   startWorkspace: { ar: "ابدأ عملك", en: "Start your work" },
@@ -156,10 +227,10 @@ const dict = {
   layoutMode: { ar: "تخطيط التصدير", en: "Export layout" },
   layoutStandard: { ar: "قياسي (صفحة لكل صورة)", en: "Standard (1 per page)" },
   layoutIdCard: { ar: "بطاقة هوية (وجهان في A4)", en: "ID Card (2-in-1 A4)" },
-  ocrNotesTitle: { ar: "النص المستخرج وملاحظات المستند", en: "Extracted text & document notes" },
+  ocrNotesTitle: { ar: "ملاحظات المستند", en: "Document notes" },
   ocrNotesPlaceholder: {
-    ar: "أضف نص المستند أو ملاحظات قابلة للبحث والنسخ…",
-    en: "Add extracted text or searchable notes for this document…",
+    ar: "أضف ملاحظات قابلة للبحث والنسخ…",
+    en: "Add searchable notes for this document…",
   },
   autoAnalyzePage: { ar: "تحليل بيانات الصفحات", en: "Analyze page metadata" },
   selectedPagePreview: { ar: "معاينة الصفحة المحددة", en: "Selected page preview" },
